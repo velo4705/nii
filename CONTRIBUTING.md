@@ -26,6 +26,7 @@ There is no build step. The plugin is plain TypeScript loaded by OpenCode.
 | `.opencode/plugins/nii/stuck.ts` | Pure failure/pivot logic — thresholds, cap, error signatures, coach prompt |
 | `.opencode/plugins/nii/learning.ts` | Pure strategy memory — reward, ranking, cap, matching |
 | `.opencode/plugins/nii/commands.ts` | Pure `/nii` argument parsing |
+| `.opencode/plugins/nii/api.ts` | Compatibility shim for `generate.text` vs `experimental.generate.text` |
 | `tests/` | `node:test` checks for every pure module |
 
 ## Testing
@@ -34,7 +35,9 @@ There is no build step. The plugin is plain TypeScript loaded by OpenCode.
 npm test
 ```
 
-Node 24 runs the TypeScript tests directly. There is no build step and no dependency install. Add a test whenever you change a threshold, a prompt, or a storage key. Keep new logic pure and in `stuck.ts`, `commands.ts`, or `playbook.ts` so it can be tested without loading OpenCode.
+Node 24 runs the TypeScript tests directly. There is no build step and no dependency install. Add a test whenever you change a threshold, a prompt, or a storage key. Keep new logic pure and in `stuck.ts`, `commands.ts`, `api.ts`, or `playbook.ts` so it can be tested without loading OpenCode.
+
+For live verification, use a fresh project directory with `opencode run --standalone`. A shared server keeps old plugin instances alive across hot reloads, and those stale instances can overwrite the same plugin-storage keys and hide the behavior you are trying to observe.
 
 Keep these boundaries. In particular, keep prompt text in `playbook.ts` so the mandate stays easy to review.
 

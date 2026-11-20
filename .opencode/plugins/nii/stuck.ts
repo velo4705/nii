@@ -31,6 +31,38 @@ export function errorSignature(type: string, message: string): string {
   return `${type}: ${cleaned}`.trim()
 }
 
+/** The subset of a tool event the failure detector needs. */
+export type ToolOutcome = {
+  error?: { type?: string; message?: string }
+  metadata?: { exit?: number; status?: string }
+  content?: readonly { type?: string; text?: string }[]
+}
+
+/**
+ * A non-zero shell exit is delivered as `session.tool.success` with
+ * `metadata.exit`, so the event name alone cannot identify a failure.
+ */
+export function isToolFailure(eventType: string, data: ToolOutcome): boolean {
+  if (eventType === "session.tool.failed") return true
+  if (eventType !== "session.tool.success") return false
+  if (data.metadata?.status === "error") return true
+
+  const exit = data.metadata?.exit
+  if (typeof exit === "number" && exit !== 0) return true
+
+  const text = data.content?.map((part) => part.text ?? "").join("\n") ?? ""
+  return /Exited with code [1-9]\d*/.test(text)
+}
+
+export function toolFailureSignature(data: ToolOutcome): string {
+  const type = data.error?.type ?? (data.metadata?.exit !== undefined ? "shell" : "tool")
+  const message =
+    data.error?.message ??
+    data.content?.map((part) => part.text ?? "").join("\n").trim() ??
+    "unknown failure"
+  return errorSignature(type, message)
+}
+
 export function recordFailure(state: StuckState, signature: string): StuckState {
   const ruledOut = state.ruledOut.includes(signature)
     ? state.ruledOut

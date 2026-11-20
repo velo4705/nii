@@ -5,12 +5,14 @@ import {
   emptyStuckState,
   errorSignature,
   FAILURE_THRESHOLD,
+  isToolFailure,
   isExhausted,
   markPivoted,
   MAX_PIVOTS,
   recordFailure,
   recordSuccess,
   shouldPivot,
+  toolFailureSignature,
 } from "../.opencode/plugins/nii/stuck.ts"
 
 function streakOf(n: number, signature = "tool.error: boom") {
@@ -18,6 +20,27 @@ function streakOf(n: number, signature = "tool.error: boom") {
   for (let i = 0; i < n; i++) state = recordFailure(state, signature)
   return state
 }
+
+test("a failing shell command is a failure even though its event says success", () => {
+  const failedShell = {
+    metadata: { status: "completed", exit: 1 },
+    content: [{ type: "text", text: "cat: missing: No such file or directory\nExited with code 1" }],
+  }
+  assert.equal(isToolFailure("session.tool.success", failedShell), true)
+  assert.equal(isToolFailure("session.tool.success", { metadata: { exit: 0 } }), false)
+  assert.equal(isToolFailure("session.tool.failed", { error: { message: "oops" } }), true)
+  assert.equal(isToolFailure("session.tool.input.started", {}), false)
+})
+
+test("failure signatures work for shell output without an error object", () => {
+  assert.equal(
+    toolFailureSignature({
+      metadata: { exit: 1 },
+      content: [{ text: "cat: /tmp/missing: No such file\nExited with code 1" }],
+    }),
+    "shell: cat: <path>: No such file",
+  )
+})
 
 test("failures accumulate into a streak and dedupe identical signatures", () => {
   const state = streakOf(4)

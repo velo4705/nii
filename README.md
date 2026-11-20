@@ -94,6 +94,7 @@ Disabling takes effect on the very next model call, because the gate is checked 
   stuck.ts       # pure failure/pivot logic (thresholds, cap, coach prompt)
   learning.ts    # pure strategy-memory logic (reward, rank, cap, match)
   commands.ts    # pure /nii argument parsing
+  api.ts         # compatibility shim for the one-shot generation API
   SKILL.md       # path target for the registered skill
 tests/           # node:test suite
 README.md
@@ -122,7 +123,7 @@ npm publish
 ## Testing
 
 ```sh
-npm test           # 29 checks
+npm test           # 34 checks
 npm run pack:check # inspect tarball contents
 ```
 

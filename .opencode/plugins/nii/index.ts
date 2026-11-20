@@ -15,6 +15,7 @@
  */
 
 import { Plugin, Skill } from "@opencode/plugin"
+import { resolveGenerateText } from "./api"
 import { parseNiiCommand } from "./commands"
 import {
   BASE_MANDATE,
@@ -40,13 +41,15 @@ import {
 } from "./state"
 import {
   buildCoachPrompt,
-  errorSignature,
   isExhausted,
+  isToolFailure,
   markPivoted,
   MAX_PIVOTS,
   recordFailure,
   recordSuccess,
   shouldPivot,
+  toolFailureSignature,
+  type ToolOutcome,
 } from "./stuck"
 
 export default Plugin.define({
@@ -78,23 +81,20 @@ export default Plugin.define({
         types: ["session.tool.failed", "session.tool.success"],
         signal: controller.signal,
       })) {
-        const data = event.data as {
-          sessionID?: string
-          error?: { type?: string; message?: string }
-        }
+        // The server ignores `types` here and delivers every event; filter
+        // explicitly so tool start/progress events cannot reset a streak.
+        if (event.type !== "session.tool.failed" && event.type !== "session.tool.success") continue
+
+        const data = event.data as ToolOutcome & { sessionID?: string }
         if (!data.sessionID) continue
         if (!(await isEnabled(ctx, data.sessionID))) continue
 
         const current = await readStuck(ctx, data.sessionID)
 
-        if (event.type === "session.tool.failed") {
+        if (isToolFailure(event.type, data)) {
           // The previous pivot did not settle the problem; do not credit it.
           await clearPending(ctx, data.sessionID)
-          const signature = errorSignature(
-            data.error?.type ?? "tool.error",
-            data.error?.message ?? "unknown failure",
-          )
-          await writeStuck(ctx, data.sessionID, recordFailure(current, signature))
+          await writeStuck(ctx, data.sessionID, recordFailure(current, toolFailureSignature(data)))
           continue
         }
 
@@ -131,8 +131,10 @@ export default Plugin.define({
         try {
           const model = await ctx.model.default()
           if (!model) throw new Error("no default model available")
+          const generateText = resolveGenerateText(ctx)
+          if (!generateText) throw new Error("no one-shot generation API available")
           const learned = await readLearning(ctx)
-          const coach = await ctx.experimental.generate.text({
+          const coach = await generateText({
             model: { providerID: model.providerID, id: model.id },
             prompt: buildCoachPrompt(stuck.ruledOut, matchingStrategies(learned, stuck.ruledOut)),
           })
