@@ -24,8 +24,32 @@ The user can disable this at any time with /nii off. Obey immediately.`
 /** Added to the system instructions after repeated failures. */
 export const STUCK_NUDGE = `NII stuckness signal: the recent tool calls failed repeatedly. Do not retry the same action with cosmetic changes. State what failed, then use the nii playbook to pick a genuinely different approach before continuing.`
 
+/** Added once a pivot has been delivered or failures cross the threshold. */
+export const ESCALATED_MANDATE = `NII escalation: the current method is not working. Stop adjusting parameters and name the precise blocker. Choose a mechanism you have NOT used yet from the nii playbook, take the smallest step, and verify it. Do not report failure until the playbook's strategy moves are exhausted.`
+
 /** Added once the pivot budget is spent: persistence must stop being automatic. */
 export const EXHAUSTED_MANDATE = `NII pivot budget exhausted for this session. Stop attempting new approaches on your own. Report with evidence: what you tried, what failed, what remains unverified, and which genuine blocker applies. Ask the user before continuing. This is a correct outcome, not a failure of resolve.`
+
+/**
+ * One coherent, adaptive motivation directive. Intensity rises with evidence
+ * of stuckness, then deliberately falls away once the budget is spent so the
+ * agent stops pushing on its own.
+ */
+export function motivationFor(failures: number, pivots: number, maxPivots: number): string {
+  if (pivots >= maxPivots) return `${BASE_MANDATE}\n\n${EXHAUSTED_MANDATE}`
+  if (pivots > 0 || failures >= 3) return `${BASE_MANDATE}\n\n${ESCALATED_MANDATE}`
+  if (failures >= 2) return `${BASE_MANDATE}\n\n${STUCK_NUDGE}`
+  return BASE_MANDATE
+}
+
+/** Deterministic pivot used when the coach is unavailable or unoriginal. */
+export function fallbackProposal(ruledOut: readonly string[]): string {
+  const tried = ruledOut.length > 0 ? `\n\nAlready failed: ${ruledOut.slice(0, 4).join("; ")}.` : ""
+
+  return `The strategy coach is unavailable, so use the playbook directly.${tried}
+
+Pick ONE strategy move you have not used yet: decompose the goal; change representation; search prior art; remove an assumed constraint; build a minimal experiment; switch tool or environment; borrow an analogy from another domain. Take the smallest step of that move and define the observable evidence that would prove it worked. Do not repeat a failed approach with cosmetic changes.`
+}
 
 export function pivotMessage(proposal: string, pivotNumber: number, maxPivots: number): string {
   return `[NII — strategy pivot ${pivotNumber}/${maxPivots}] The current approach has failed repeatedly. Change method now.
@@ -88,10 +112,11 @@ The user can disable NII at any time with \`/nii off\`. Obey immediately.`
 
 export const HELP_TEXT = `NII — Nothing Is Impossible
 
-Usage: /nii [on|off|status|help]
+Usage: /nii [on|off|reset|status|help]
 
   on      Enable the NII mandate for this session
   off     Disable the NII mandate for this session (kill switch)
+  reset   Clear this session's failure streak and pivot budget (keeps learning)
   status  Show whether NII is active for this session
   help    Show this message
 
@@ -105,11 +130,13 @@ export function statusText(
   pivots?: number,
   maxPivots?: number,
   learned?: number,
+  lastPivot?: string,
 ): string {
   const budget = pivots === undefined || maxPivots === undefined ? "" : `\n\nStrategy pivots used: ${pivots}/${maxPivots}.`
   const memory = learned === undefined ? "" : `\nStrategies learned: ${learned}.`
+  const recent = lastPivot ? `\nLast pivot: ${lastPivot.slice(0, 160)}` : ""
 
-  return `NII status: ${enabled ? "ON" : "OFF"} (${scope}).${budget}${memory}
+  return `NII status: ${enabled ? "ON" : "OFF"} (${scope}).${budget}${memory}${recent}
 
 ${enabled ? BASE_MANDATE : "The NII mandate is disabled for this session. Standard behavior applies."}`
 }

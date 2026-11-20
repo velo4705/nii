@@ -47,15 +47,25 @@ export async function readStuck(ctx: NiiContext, sessionID: string): Promise<Stu
 
   const value = raw as Partial<StuckState>
   return {
-    streak: typeof value.streak === "number" ? value.streak : 0,
+    recent: Array.isArray(value.recent) ? value.recent.filter((item) => typeof item === "string") : [],
     pivots: typeof value.pivots === "number" ? value.pivots : 0,
-    lastPivotStreak: typeof value.lastPivotStreak === "number" ? value.lastPivotStreak : 0,
+    lastPivotFailureCount:
+      typeof value.lastPivotFailureCount === "number" ? value.lastPivotFailureCount : 0,
     ruledOut: Array.isArray(value.ruledOut) ? value.ruledOut.filter((item) => typeof item === "string") : [],
+    lastPivot: typeof value.lastPivot === "string" ? value.lastPivot : undefined,
+    pivotsTried: Array.isArray(value.pivotsTried)
+      ? value.pivotsTried.filter((item) => typeof item === "string")
+      : [],
   }
 }
 
 export async function writeStuck(ctx: NiiContext, sessionID: string, state: StuckState): Promise<void> {
   await ctx.storage.set(stuckKey(sessionID), state)
+}
+
+export async function clearStuck(ctx: NiiContext, sessionID: string): Promise<void> {
+  await ctx.storage.remove(stuckKey(sessionID))
+  await ctx.storage.remove(pendingKey(sessionID))
 }
 
 export async function readLearning(ctx: NiiContext): Promise<LearningEntry[]> {

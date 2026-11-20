@@ -1,27 +1,32 @@
 /**
- * Pure stuckness logic for NII Phase 2.
+ * Pure stuckness logic for NII.
  *
  * No I/O here on purpose: every decision can be tested directly. The plugin
- * only counts failures, counts pivots, and produces a coach prompt.
+ * only counts outcomes, counts pivots, and produces a coach prompt.
  */
 
 export const FAILURE_THRESHOLD = 3
 export const MAX_PIVOTS = 3
+export const FAILURE_WINDOW = 10
 const MAX_RULED_OUT = 8
 
 export type StuckState = {
-  /** Consecutive tool failures on the current approach. */
-  streak: number
+  /** Recent tool outcomes: "" means success, otherwise a failure signature. */
+  recent: string[]
   /** Strategy pivots already issued in this session. */
   pivots: number
-  /** Streak at which the last pivot was issued. */
-  lastPivotStreak: number
+  /** Failure count at which the last pivot was issued. */
+  lastPivotFailureCount: number
   /** Short signatures of approaches/errors already observed. */
   ruledOut: string[]
+  /** Most recent pivot proposal, for /nii status. */
+  lastPivot?: string
+  /** Strategies already delivered, used as a diversity guard. */
+  pivotsTried: string[]
 }
 
 export function emptyStuckState(): StuckState {
-  return { streak: 0, pivots: 0, lastPivotStreak: 0, ruledOut: [] }
+  return { recent: [], pivots: 0, lastPivotFailureCount: 0, ruledOut: [], pivotsTried: [] }
 }
 
 /** Reduce an error to a compact, comparable signature. */
@@ -63,47 +68,74 @@ export function toolFailureSignature(data: ToolOutcome): string {
   return errorSignature(type, message)
 }
 
+/** Failures in the recent window. Successes no longer erase earlier evidence. */
+export function failureCount(state: StuckState): number {
+  return state.recent.filter((item) => item !== "").length
+}
+
+/** The same failure twice in a row is a cosmetic-retry signal. */
+export function hasRepeatedFailure(state: StuckState): boolean {
+  const n = state.recent.length
+  if (n < 2) return false
+  const a = state.recent[n - 1]!
+  const b = state.recent[n - 2]!
+  return a !== "" && a === b
+}
+
 export function recordFailure(state: StuckState, signature: string): StuckState {
   const ruledOut = state.ruledOut.includes(signature)
     ? state.ruledOut
     : [...state.ruledOut, signature].slice(-MAX_RULED_OUT)
 
-  return { ...state, streak: state.streak + 1, ruledOut }
+  return {
+    ...state,
+    recent: [...state.recent, signature].slice(-FAILURE_WINDOW),
+    ruledOut,
+  }
 }
 
-/** Any success breaks the failure streak; the pivot budget is not restored. */
 export function recordSuccess(state: StuckState): StuckState {
-  return { ...state, streak: 0 }
+  return { ...state, recent: [...state.recent, ""].slice(-FAILURE_WINDOW) }
 }
 
 export function shouldPivot(state: StuckState): boolean {
+  const count = failureCount(state)
+  const triggered = count >= FAILURE_THRESHOLD || hasRepeatedFailure(state)
   return (
-    state.streak >= FAILURE_THRESHOLD &&
-    state.streak > state.lastPivotStreak &&
+    triggered &&
+    count > state.lastPivotFailureCount &&
     state.pivots < MAX_PIVOTS
   )
 }
 
 export function markPivoted(state: StuckState): StuckState {
-  return { ...state, pivots: state.pivots + 1, lastPivotStreak: state.streak }
+  return { ...state, pivots: state.pivots + 1, lastPivotFailureCount: failureCount(state) }
 }
 
 export function isExhausted(state: StuckState): boolean {
   return state.pivots >= MAX_PIVOTS
 }
 
-export function buildCoachPrompt(ruledOut: string[], knownStrategies: string[] = []): string {
+export function buildCoachPrompt(
+  ruledOut: string[],
+  knownStrategies: string[] = [],
+  avoidedStrategies: string[] = [],
+): string {
   const list = ruledOut.length > 0 ? ruledOut.map((item) => `- ${item}`).join("\n") : "- (no failure details recorded)"
   const known =
     knownStrategies.length > 0
       ? `\n\nStrategies that worked for similar failures before:\n${knownStrategies.map((item) => `- ${item}`).join("\n")}\n\nAdapt one of these if it fits this situation, or propose something better.`
+      : ""
+  const avoided =
+    avoidedStrategies.length > 0
+      ? `\n\nDo NOT repeat these — they were tried and did not work:\n${avoidedStrategies.map((item) => `- ${item}`).join("\n")}`
       : ""
 
   return `You are the NII strategy coach. An agent is stuck on a task and has already tried the approaches below without success.
 
 Already tried or failed:
 ${list}
-${known}
+${known}${avoided}
 
 Propose ONE genuinely different approach — a different mechanism, not a parameter change or a re-run. Include:
 1. the approach in two or three sentences;

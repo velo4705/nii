@@ -4,9 +4,12 @@ import {
   buildCoachPrompt,
   emptyStuckState,
   errorSignature,
+  failureCount,
   FAILURE_THRESHOLD,
-  isToolFailure,
+  FAILURE_WINDOW,
+  hasRepeatedFailure,
   isExhausted,
+  isToolFailure,
   markPivoted,
   MAX_PIVOTS,
   recordFailure,
@@ -15,7 +18,7 @@ import {
   toolFailureSignature,
 } from "../.opencode/plugins/nii/stuck.ts"
 
-function streakOf(n: number, signature = "tool.error: boom") {
+function failures(n: number, signature = "tool.error: boom") {
   let state = emptyStuckState()
   for (let i = 0; i < n; i++) state = recordFailure(state, signature)
   return state
@@ -42,49 +45,63 @@ test("failure signatures work for shell output without an error object", () => {
   )
 })
 
-test("failures accumulate into a streak and dedupe identical signatures", () => {
-  const state = streakOf(4)
-  assert.equal(state.streak, 4)
+test("failures accumulate and dedupe identical signatures", () => {
+  const state = failures(4)
+  assert.equal(failureCount(state), 4)
   assert.deepEqual(state.ruledOut, ["tool.error: boom"])
 })
 
 test("error signatures drop paths and keep the first line", () => {
-  assert.equal(
-    errorSignature("shell", "/tmp/build failed:\nline two"),
-    "shell: <path> failed:",
-  )
+  assert.equal(errorSignature("shell", "/tmp/build failed:\nline two"), "shell: <path> failed:")
 })
 
-test("a success resets the streak but keeps the pivot budget", () => {
-  const pivoted = markPivoted(streakOf(3))
-  const afterSuccess = recordSuccess(pivoted)
-  assert.equal(afterSuccess.streak, 0)
-  assert.equal(afterSuccess.pivots, 1)
+test("successes do not erase earlier failures — the window does", () => {
+  let state = failures(2)
+  state = recordSuccess(state)
+  assert.equal(failureCount(state), 2)
+  assert.equal(shouldPivot(state), false)
 })
 
-test(`a pivot is offered at ${FAILURE_THRESHOLD} failures, not before`, () => {
-  assert.equal(shouldPivot(streakOf(FAILURE_THRESHOLD - 1)), false)
-  assert.equal(shouldPivot(streakOf(FAILURE_THRESHOLD)), true)
+test("old outcomes fall out of the window", () => {
+  let state = emptyStuckState()
+  for (let i = 0; i < FAILURE_WINDOW + 1; i++) state = recordSuccess(state)
+  state = recordFailure(state, "only: failure")
+  assert.equal(failureCount(state), 1)
+  assert.deepEqual(state.recent.slice(-2), ["", "only: failure"])
 })
 
-test("a pivot is not repeated for the same streak", () => {
-  const state = streakOf(4)
+test("the same failure twice in a row is a repeat signal", () => {
+  assert.equal(hasRepeatedFailure(failures(2)), true)
+  assert.equal(hasRepeatedFailure(failures(1)), false)
+  assert.equal(hasRepeatedFailure(recordSuccess(failures(1))), false)
+})
+
+test("a repeat can trigger a pivot below the numeric threshold", () => {
+  assert.equal(shouldPivot(failures(2)), true)
+  assert.equal(shouldPivot(failures(FAILURE_THRESHOLD)), true)
+})
+
+test(`a pivot is not repeated for the same failure count`, () => {
+  const state = failures(4)
   assert.equal(shouldPivot(state), true)
   assert.equal(shouldPivot(markPivoted(state)), false)
 })
 
-test("a further failure after a pivot can trigger another pivot", () => {
-  const state = recordFailure(markPivoted(streakOf(3)), "new: failure")
+test("new failures after a pivot can trigger another pivot", () => {
+  const state = recordFailure(markPivoted(failures(3)), "new: failure")
   assert.equal(shouldPivot(state), true)
 })
 
 test(`the pivot budget is capped at ${MAX_PIVOTS}`, () => {
   let state = emptyStuckState()
   for (let i = 0; i < MAX_PIVOTS; i++) {
-    state = markPivoted(recordFailure(state, `failure ${i}`))
+    for (let j = 0; j < FAILURE_THRESHOLD; j++) state = recordFailure(state, `failure ${i}-${j}`)
+    assert.equal(shouldPivot(state), true)
+    state = markPivoted(state)
   }
   assert.equal(isExhausted(state), true)
-  assert.equal(shouldPivot(recordFailure(state, "one more")), false)
+  state = recordFailure(state, "one more")
+  assert.equal(shouldPivot(state), false)
 })
 
 test("the coach prompt names what failed and demands a different method", () => {
