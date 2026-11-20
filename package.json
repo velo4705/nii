@@ -1,0 +1,30 @@
+{
+  "name": "opencode-nii",
+  "version": "0.1.0",
+  "description": "Nothing Is Impossible — bounded, adaptive persistence for OpenCode agents",
+  "license": "MIT",
+  "type": "module",
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "agent",
+    "persistence",
+    "research"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "exports": {
+    ".": "./.opencode/plugins/nii/index.ts"
+  },
+  "files": [
+    ".opencode/plugins/nii",
+    "README.md",
+    "CONTRIBUTING.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test tests/*.test.ts",
+    "pack:check": "npm pack --dry-run"
+  }
+}
