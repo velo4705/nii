@@ -20,6 +20,7 @@ import {
   isRefusal,
   recordBlocker,
   recordRefusal,
+  shouldEscalateRefusal,
 } from "../.opencode/plugins/nii/stuck.ts"
 
 function failures(n: number, signature = "tool.error: boom") {
@@ -139,6 +140,22 @@ test("a genuine blocker stops pivoting, even at the threshold", () => {
   assert.equal(blocked.blockers, 1)
   assert.equal(shouldPivot(blocked), false)
   assert.equal(shouldPivot(failures(4)), true)
+})
+
+test("blockers are capped and benign errors are not blockers", () => {
+  let state = emptyStuckState()
+  for (let i = 0; i < 15; i++) state = recordBlocker(state)
+  assert.equal(state.blockers, 10)
+  assert.equal(isGenuineBlocker("cat: /tmp/file: No such file"), false)
+  assert.equal(isGenuineBlocker("timeout after 5000ms"), false)
+})
+
+test("two text refusals escalate without a tool failure", () => {
+  let state = emptyStuckState()
+  state = recordRefusal(state)
+  assert.equal(shouldEscalateRefusal(state), false)
+  state = recordRefusal(state)
+  assert.equal(shouldEscalateRefusal(state), true)
 })
 
 test("the coach prompt names what failed and demands a different method", () => {

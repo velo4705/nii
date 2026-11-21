@@ -10,6 +10,7 @@ import {
   fallbackProposal,
   HELP_TEXT,
   motivationFor,
+  pivotMessage,
   SKILL_PLAYBOOK,
   statusText,
   STUCK_NUDGE,
@@ -90,6 +91,13 @@ test("fallback proposal is deterministic and references ruled-out approaches", (
   assert.match(text, /shell: build failed/)
   assert.match(text, /strategy move you have not used yet/)
   assert.ok(fallbackProposal([]) !== text)
+})
+
+test("pivot messages are numbered and demand a goal restatement", () => {
+  const msg = pivotMessage("switch to a graph database", 2, 3)
+  assert.match(msg, /\[NII — strategy pivot 2\/3\]/)
+  assert.match(msg, /Goal restatement/)
+  assert.match(msg, /switch to a graph database/)
 })
 
 test("help text documents the reset command", () => {

@@ -39,6 +39,8 @@ Legend:
 - **Refusal tuning** — two refusals, or one refusal plus a tool failure, are required before escalating; `verify` was removed from refusal verbs to avoid blocking on "I can't verify the key" (which is handled as a genuine blocker instead).
 - **Coach model option** — `coachModel` plugin option selects the coach model; deterministic fallback covers coach/API failures.
 
+**Test coverage:** unit tests for every pure module plus `tests/session.test.ts`, a session-lifecycle integration suite that exercises the full state machine (66 checks total).
+
 **Milestone status:** 🟢
 
 Refusals and goal restatement are additions to this milestone's acceptance criteria, added during post-release review.

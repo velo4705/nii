@@ -61,6 +61,25 @@ test("storage keys are scoped to project and session", async () => {
   assert.deepEqual([...data.keys()], ["nii:p:default:session:abc:enabled"])
 })
 
+test("projectScope falls back to the directory when no project id is present", () => {
+  const data = new Map<string, unknown>()
+  const ctx: NiiContext = {
+    storage: {
+      async get(key: string) {
+        return data.get(key)
+      },
+      async set(key: string, value: unknown) {
+        data.set(key, value)
+      },
+      async remove(key: string) {
+        data.delete(key)
+      },
+    },
+    location: { directory: "/work/alias", project: {} },
+  }
+  assert.equal(projectScope(ctx), "/work/alias")
+})
+
 test("separate projects do not share state", async () => {
   const alpha = makeCtx({}, {}, "alpha")
   const beta = makeCtx({}, {}, "beta")

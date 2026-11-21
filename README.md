@@ -142,9 +142,11 @@ See [ROADMAP.md](ROADMAP.md) for the full milestone plan — milestones 1 (core 
 ## Testing
 
 ```sh
-npm test           # 52 checks
+npm test           # 66 checks (unit + session-lifecycle integration)
 npm run pack:check # inspect tarball contents
 ```
+
+`tests/session.test.ts` drives full session lifecycles through the real state and learning modules: failure windows, one-pivot-at-a-time, successful and failed pivots, cross-session/project learning, genuine blockers, refusal escalation, pivot-budget exhaustion, and `/nii reset`.
 
 Uses Node 24's native TypeScript support — no dependencies or build step.
 

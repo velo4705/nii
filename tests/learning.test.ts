@@ -71,6 +71,12 @@ test("diversity guard rejects near-duplicate proposals", () => {
   assert.equal(isDistinctEnough("anything at all", []), true)
 })
 
+test("the diversity guard rejects empty and near-duplicate proposals", () => {
+  assert.equal(isDistinctEnough("   ", ["old approach"]), false)
+  assert.equal(isDistinctEnough("old approach", ["old approach"]), false)
+  assert.equal(isDistinctEnough("use a graph database instead", ["old approach"]), true)
+})
+
 test("stored strategies are truncated to a compact hint", () => {
   const entries = recordLearning([], ["a"], "x".repeat(900), 1)
   assert.equal(entries[0]!.strategy.length, 400)
