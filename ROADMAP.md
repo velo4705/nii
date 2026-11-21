@@ -42,6 +42,8 @@ Legend:
 - **Bounded retry hook** — rate limits and transient provider errors get capped exponential backoff; permanent 4xx fails fast.
 - **Broader quit detection** — assistant text is scanned for refusal, handoff, partial-answer, and uncertainty signals, plus unverified success claims that demand evidence.
 
+**Installation setup:** 🟢 — `scripts/install.mjs` with a formatted banner and interactive menu: OpenCode CLI / Desktop, Flatpak (Linux only), or this project. Non-interactive flags `--cli` / `--flatpak` / `--local` / `--force` / `--dry-run`; bins `opencode-nii` / `nii-install` / `nii`; canonical `setup` subcommand (`npx opencode-nii@latest setup`) and `uninstall` subcommand (`npx opencode-nii@latest uninstall`) that removes just the NII entry from Native/Flatpak `opencode.json` — defaults to **both platforms**, with a warning during setup when the other platform is already connected; `INSTALL.md` + `examples/opencode.jsonc`; 15 installer tests. Note: the unscoped npm name `nii` is taken by an unrelated framework; a scoped `@nii/nii` alias would make `npx @nii/nii@latest setup` work with the already-wired `nii` bin.
+
 **Test coverage:** unit tests for every pure module plus `tests/session.test.ts`, a session-lifecycle integration suite that exercises the full state machine (66 checks total).
 
 **Milestone status:** 🟢

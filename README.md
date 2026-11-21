@@ -78,7 +78,7 @@ Reporting a real blocker is a correct outcome, not a lack of resolve.
 
 ## Quick start
 
-Local development: plugins under `.opencode/plugins/` load automatically — no config entry required.
+See [INSTALL.md](INSTALL.md) for the installer, global setup, and troubleshooting. Short version: plugins under `.opencode/plugins/` load automatically — no config entry required.
 
 ```sh
 cd /path/to/this/repo
@@ -159,7 +159,7 @@ See [ROADMAP.md](ROADMAP.md) for the full milestone plan — milestones 1 (core 
 ## Testing
 
 ```sh
-npm test           # 89 checks (unit + session/retry/atomic/quit integration)
+npm test           # 104 checks (unit + session/retry/atomic/quit/integration + installer/setup/uninstall)
 npm run pack:check # inspect tarball contents
 ```
 

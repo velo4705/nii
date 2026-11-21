@@ -17,10 +17,19 @@
   "exports": {
     ".": "./.opencode/plugins/nii/index.ts"
   },
+  "bin": {
+    "opencode-nii": "./scripts/install.mjs",
+    "nii-install": "./scripts/install.mjs",
+    "nii": "./scripts/install.mjs"
+  },
   "files": [
     ".opencode/plugins/nii",
+    "scripts",
+    "examples",
+    "INSTALL.md",
     "README.md",
     "CONTRIBUTING.md",
+    "ROADMAP.md",
     "LICENSE"
   ],
   "scripts": {
