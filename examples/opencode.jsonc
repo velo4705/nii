@@ -1,0 +1,27 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // Local install: no entry needed — .opencode/plugins/nii auto-loads.
+  // For an npm/global install, pass options through the plugins array:
+  "plugins": [
+    {
+      "package": "opencode-nii",
+      "options": {
+        // Learn strategies per project (default). true = share across projects.
+        "shareLearning": false,
+
+        // Model used for the small strategy-coach generation.
+        // Omit to use the session's default model.
+        "coachModel": {
+          "providerID": "anthropic",
+          "id": "claude-sonnet-4-5"
+        },
+
+        // Bounded retry hook for provider/rate-limit failures.
+        "retryMaxRetries": 3,
+        "retryBaseDelayMs": 1000,
+        "retryMaxDelayMs": 30000
+      }
+    }
+  ]
+}
