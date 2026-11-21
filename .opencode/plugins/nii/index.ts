@@ -18,24 +18,18 @@ import { Plugin, Skill } from "@opencode/plugin"
 import { resolveGenerateText } from "./api"
 import { parseNiiCommand } from "./commands"
 import {
-  fallbackProposal,
+  BASE_MANDATE,
+  EXHAUSTED_MANDATE,
   HELP_TEXT,
-  motivationFor,
   pivotMessage,
   SKILL_PLAYBOOK,
   statusText,
+  STUCK_NUDGE,
 } from "./playbook"
-import {
-  ineffectiveStrategies,
-  isDistinctEnough,
-  matchingStrategies,
-  recordIneffective,
-  recordLearning,
-} from "./learning"
+import { matchingStrategies, recordLearning } from "./learning"
 import {
   clearPending,
   clearSessionOverride,
-  clearStuck,
   isEnabled,
   readLearning,
   readPending,
@@ -47,7 +41,6 @@ import {
 } from "./state"
 import {
   buildCoachPrompt,
-  failureCount,
   isExhausted,
   isToolFailure,
   markPivoted,
