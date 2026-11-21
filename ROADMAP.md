@@ -38,6 +38,9 @@ Legend:
 - **Genuine blocker detection** — permission denied / 401 / 403 / missing credentials stop the pivot loop and deliver a stop-and-report mandate.
 - **Refusal tuning** — two refusals, or one refusal plus a tool failure, are required before escalating; `verify` was removed from refusal verbs to avoid blocking on "I can't verify the key" (which is handled as a genuine blocker instead).
 - **Coach model option** — `coachModel` plugin option selects the coach model; deterministic fallback covers coach/API failures.
+- **Interruption-safe pivot delivery** — durable claim before delivery, budget consumed only after the synthetic message is accepted; a per-session lock prevents duplicate pivots; resumed sessions replay the claimed pivot.
+- **Bounded retry hook** — rate limits and transient provider errors get capped exponential backoff; permanent 4xx fails fast.
+- **Broader quit detection** — assistant text is scanned for refusal, handoff, partial-answer, and uncertainty signals, plus unverified success claims that demand evidence.
 
 **Test coverage:** unit tests for every pure module plus `tests/session.test.ts`, a session-lifecycle integration suite that exercises the full state machine (66 checks total).
 

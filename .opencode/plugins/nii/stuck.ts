@@ -1,5 +1,5 @@
 /**
- * Pure stuckness logic for NII.
+ * Pure stuckness and quit-signal detection for NII.
  *
  * No I/O here on purpose: every decision can be tested directly. The plugin
  * only counts outcomes, counts pivots, and produces a coach prompt.
@@ -27,34 +27,89 @@ export type StuckState = {
   /** Strategies already delivered, used as a diversity guard. */
   pivotsTried: string[]
   /**
-   * Claims of inability in assistant text. A single claim is recorded; two
-   * (or one plus a real tool failure) escalate the mandate.
+   * Claims of inability or handoff in assistant text. A single claim is
+   * recorded; two (or one plus a real tool failure) escalate the mandate.
    */
   refusals: number
+  /**
+   * "Done!" style claims made while failures are still in the window.
+   * Reset by a successful tool call, which is the evidence being demanded.
+   */
+  successClaims: number
   /**
    * Genuine blockers detected in tool output — missing credentials, denied
    * permissions, proven limits. Pivoting stops when one of these appears.
    */
   blockers: number
+  /**
+   * A pivot that was decided but not yet delivered. Durable so a crash or
+   * provider interruption can replay the exact same pivot instead of
+   * spending the budget without telling the agent.
+   */
+  inflight?: InflightPivot
 }
 
+export type InflightPivot = { proposal: string; signatures: string[] }
+
 export const MAX_REFUSALS = 10
+export const MAX_SUCCESS_CLAIMS = 10
 export const MAX_BLOCKERS = 10
 
 /**
+ * Every text pattern that means "I'm quitting" in a solvable task. Grouped so
+ * the reports can say *how* the agent tried to exit.
+ *
  * Deliberately excludes "verify": "I can't verify the API key" is a genuine
- * blocker, not a give-up. Those are detected by BLOCKER_PATTERNS instead.
+ * blocker, handled by BLOCKER_PATTERNS instead.
  */
-export const REFUSAL_PATTERNS: RegExp[] = [
-  /\b(?:i|we) cannot (?:do|fix|complete|finish|solve|run|make|figure out)\b/i,
-  /\b(?:i|we) can(?:not|'t) (?:do|fix|complete|finish|solve|run|make|figure out)\b/i,
-  /\b(?:i|we) give up\b/i,
-  /\b(?:unable|impossible|not possible) to (?:do|fix|complete|finish|solve|run|make)\b/i,
-  /\bno way to (?:do|complete|solve)\b/i,
+export const QUIT_PATTERNS = {
+  refusal: [
+    /\b(?:i|we) cannot (?:do|fix|complete|finish|solve|run|make|figure out)\b/i,
+    /\b(?:i|we) can(?:not|'t) (?:do|fix|complete|finish|solve|run|make|figure out)\b/i,
+    /\bimpossible to (?:do|fix|complete|finish|solve|run|make)\b/i,
+  ],
+  handoff: [
+    /\b(?:i|we) (?:give up|need (?:a|the) human|need you to (?:do|handle|finish))\b/i,
+    /\byou(?:'ll| will) need to (?:do|handle|finish|complete)\b/i,
+    /\bplease (?:do|handle|finish) (?:this|it) (?:manually|yourself)\b/i,
+    /\b(?:i|we)(?:'ll| will) leave (?:the rest|this) to you\b/i,
+  ],
+  partial: [
+    /\b(?:that|this)(?:'s| is) (?:all|the best) (?:i|we) can do\b/i,
+    /\bbest (?:i|we) can (?:do|manage)\b/i,
+    /\bpartial (?:solution|answer|implementation)\b/i,
+    /\b(?:i|we)(?:'ve| have) done what (?:i|we) can\b/i,
+  ],
+  uncertainty: [
+    /\b(?:i|we) (?:don't|do not) know (?:how|what|why)\b/i,
+    /\bno idea (?:how|what|why)\b/i,
+    /\bbeyond (?:my|our) (?:capabilit(?:y|ies)|abilities|scope)\b/i,
+  ],
+} as const
+
+export type QuitKind = keyof typeof QUIT_PATTERNS
+
+export const QUIT_KINDS = Object.keys(QUIT_PATTERNS) as QuitKind[]
+
+export function detectQuitSignals(text: string): QuitKind[] {
+  return QUIT_KINDS.filter((kind) => QUIT_PATTERNS[kind].some((pattern) => pattern.test(text)))
+}
+
+/** Backwards-compatible: any text-based quitting signal. */
+export function isRefusal(text: string): boolean {
+  return detectQuitSignals(text).length > 0
+}
+
+/** A claim of completion, used to demand evidence when failures remain. */
+export const SUCCESS_CLAIM_PATTERNS: RegExp[] = [
+  /\b(?:done|complete|completed|fixed|solved)\b/i,
+  /\b(?:should|will) (?:now )?work\b/i,
+  /\b(?:that|this) (?:should|will) (?:resolve|fix|do it)\b/i,
+  /\ball (?:tests|checks) (?:pass|passing)\b/i,
 ]
 
-export function isRefusal(text: string): boolean {
-  return REFUSAL_PATTERNS.some((pattern) => pattern.test(text))
+export function isSuccessClaim(text: string): boolean {
+  return SUCCESS_CLAIM_PATTERNS.some((pattern) => pattern.test(text))
 }
 
 /** Signals a real blocker the agent cannot be expected to reason past. */
@@ -83,6 +138,7 @@ export function emptyStuckState(): StuckState {
     ruledOut: [],
     pivotsTried: [],
     refusals: 0,
+    successClaims: 0,
     blockers: 0,
   }
 }
@@ -157,16 +213,30 @@ export function recordFailure(state: StuckState, signature: string): StuckState 
 }
 
 export function recordSuccess(state: StuckState): StuckState {
-  return { ...state, recent: [...state.recent, ""].slice(-FAILURE_WINDOW), refusals: 0 }
+  return {
+    ...state,
+    recent: [...state.recent, ""].slice(-FAILURE_WINDOW),
+    refusals: 0,
+    successClaims: 0,
+  }
 }
 
 export function recordRefusal(state: StuckState): StuckState {
   return { ...state, refusals: Math.min(state.refusals + 1, MAX_REFUSALS) }
 }
 
+export function recordSuccessClaim(state: StuckState): StuckState {
+  return { ...state, successClaims: Math.min(state.successClaims + 1, MAX_SUCCESS_CLAIMS) }
+}
+
 /** Genuine blockers persist until the user explicitly resets the session. */
 export function recordBlocker(state: StuckState): StuckState {
   return { ...state, blockers: Math.min(state.blockers + 1, MAX_BLOCKERS) }
+}
+
+/** True when a claim of completion needs evidence before the task is ended. */
+export function needsVerification(state: StuckState): boolean {
+  return state.successClaims > 0 && failureCount(state) > 0
 }
 
 /** True when a refusal is strong enough to escalate the mandate. */
@@ -175,7 +245,7 @@ export function shouldEscalateRefusal(state: StuckState): boolean {
 }
 
 export function shouldPivot(state: StuckState): boolean {
-  if (state.blockers > 0) return false
+  if (state.blockers > 0 || state.inflight) return false
   const count = failureCount(state)
   const triggered = count >= FAILURE_THRESHOLD || hasRepeatedFailure(state)
   return (
@@ -185,8 +255,36 @@ export function shouldPivot(state: StuckState): boolean {
   )
 }
 
+/** Used by tests and simple callers; production code uses claim/finalize. */
 export function markPivoted(state: StuckState): StuckState {
   return { ...state, pivots: state.pivots + 1, lastPivotFailureCount: failureCount(state) }
+}
+
+/** Claim a pivot before delivery. No budget is consumed yet. */
+export function claimPivot(state: StuckState, proposal: string, signatures: string[]): StuckState {
+  return { ...state, inflight: { proposal, signatures } }
+}
+
+/**
+ * Consume the pivot only after the synthetic message was accepted. Safe to
+ * call on state read fresh from storage at finalization time.
+ */
+export function finalizePivot(state: StuckState): StuckState {
+  const pending = state.inflight
+  if (!pending) return state
+
+  return {
+    ...state,
+    pivots: state.pivots + 1,
+    lastPivotFailureCount: failureCount(state),
+    pivotsTried: [...state.pivotsTried, pending.proposal].slice(-5),
+    lastPivot: pending.proposal,
+    inflight: undefined,
+  }
+}
+
+export function clearInflight(state: StuckState): StuckState {
+  return { ...state, inflight: undefined }
 }
 
 export function isExhausted(state: StuckState): boolean {

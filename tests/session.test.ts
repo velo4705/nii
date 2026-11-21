@@ -23,11 +23,15 @@ import {
   pivotMessage,
   REFUSAL_MANDATE,
   STUCK_NUDGE,
+  VERIFY_MANDATE,
 } from "../.opencode/plugins/nii/playbook.ts"
 import {
   buildCoachPrompt,
+  claimPivot,
+  detectQuitSignals,
   emptyStuckState,
   failureCount,
+  finalizePivot,
   isExhausted,
   isGenuineBlocker,
   markPivoted,
@@ -36,6 +40,7 @@ import {
   recordFailure,
   recordRefusal,
   recordSuccess,
+  recordSuccessClaim,
   shouldEscalateRefusal,
   shouldPivot,
 } from "../.opencode/plugins/nii/stuck.ts"
@@ -221,6 +226,63 @@ test("the pivot budget caps at three and /nii reset clears it", async () => {
   assert.deepEqual(await readStuck(h.ctx, h.sessionID), emptyStuckState())
   assert.equal(await isEnabled(h.ctx, h.sessionID), false)
   assert.equal((await mandate(h)).includes(EXHAUSTED_MANDATE), false)
+})
+
+test("handoff, partial, and uncertainty text all escalate like a refusal", async () => {
+  for (const text of [
+    "You'll need to do this manually",
+    "That's all I can do",
+    "I don't know how to proceed",
+  ]) {
+    const h = harness()
+    const kinds = detectQuitSignals(text)
+    assert.ok(kinds.length > 0, `expected ${text} to be detected`)
+    await writeStuck(h.ctx, h.sessionID, recordRefusal(await readStuck(h.ctx, h.sessionID)))
+    await writeStuck(h.ctx, h.sessionID, recordRefusal(await readStuck(h.ctx, h.sessionID)))
+    assert.equal((await mandate(h)).includes(REFUSAL_MANDATE), true)
+  }
+})
+
+test("a success claim after failures demands verification, then clears on evidence", async () => {
+  const h = harness()
+  await fail(h, "shell: one")
+  await writeStuck(h.ctx, h.sessionID, recordSuccessClaim(await readStuck(h.ctx, h.sessionID)))
+  assert.equal((await mandate(h)).includes(VERIFY_MANDATE), true)
+  await succeed(h)
+  assert.equal((await mandate(h)).includes(VERIFY_MANDATE), false)
+})
+
+test("an interrupted pivot is replayed from a durable claim without re-spending", async () => {
+  const h = harness()
+  await fail(h, "shell: one")
+  await fail(h, "shell: two")
+  await fail(h, "shell: three")
+  const beforeClaim = await readStuck(h.ctx, h.sessionID)
+  assert.equal(shouldPivot(beforeClaim), true)
+
+  // Crash window: the claim is written, but the synthetic message is not.
+  await writeStuck(
+    h.ctx,
+    h.sessionID,
+    claimPivot(beforeClaim, "index the corpus instead", beforeClaim.ruledOut),
+  )
+
+  // Resume: state is re-read and the same proposal is replayed, not regenerated.
+  const resumed = await readStuck(h.ctx, h.sessionID)
+  assert.equal(shouldPivot(resumed), false)
+  assert.equal(resumed.inflight?.proposal, "index the corpus instead")
+  assert.equal(resumed.pivots, 0)
+
+  // Delivery succeeded on replay: finalize once.
+  await writeStuck(h.ctx, h.sessionID, finalizePivot(await readStuck(h.ctx, h.sessionID)))
+  await writePending(h.ctx, h.sessionID, {
+    signatures: resumed.inflight!.signatures,
+    strategy: resumed.inflight!.proposal,
+  })
+  const after = await readStuck(h.ctx, h.sessionID)
+  assert.equal(after.pivots, 1)
+  assert.equal(after.inflight, undefined)
+  assert.equal(after.lastPivot, "index the corpus instead")
 })
 
 test("a refusal alongside a failure escalates with the refusal mandate", async () => {

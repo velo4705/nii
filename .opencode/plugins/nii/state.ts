@@ -71,7 +71,18 @@ export async function readStuck(ctx: NiiContext, sessionID: string): Promise<Stu
       ? value.pivotsTried.filter((item) => typeof item === "string")
       : [],
     refusals: typeof value.refusals === "number" ? value.refusals : 0,
+    successClaims: typeof value.successClaims === "number" ? value.successClaims : 0,
     blockers: typeof value.blockers === "number" ? value.blockers : 0,
+    inflight:
+      value.inflight &&
+      typeof value.inflight === "object" &&
+      typeof value.inflight.proposal === "string" &&
+      Array.isArray(value.inflight.signatures)
+        ? {
+            proposal: value.inflight.proposal,
+            signatures: value.inflight.signatures.filter((item) => typeof item === "string"),
+          }
+        : undefined,
   }
 }
 

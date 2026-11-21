@@ -27,7 +27,16 @@ A directive is injected into every agent-loop model call (including tool continu
 
 All tiers carry the non-negotiables: reframe "impossible" as "not yet solved with the current approach", try genuinely different methods, and demand passing tests, a working artifact, or a cited source.
 
-A **refusal** is any assistant-text claim of inability ("I can't do this", "this is impossible"). Two refusals — or one refusal alongside a real tool failure — escalate with a refusal-specific mandate; a single stray phrase does not. When a pivot fires, the pivot message asks the agent to restate the goal and the one piece of evidence that would prove it done.
+**Quit signals in assistant text** come in four families, all detected from `session.text.ended`:
+
+| Signal | Examples |
+|---|---|
+| refusal | "I can't do this", "this is impossible" |
+| handoff | "you'll need to do this manually", "I give up", "we need a human" |
+| partial | "that's all I can do", "here's a partial solution" |
+| uncertainty | "I don't know how to proceed", "beyond my capabilities" |
+
+Two such signals — or one alongside a real tool failure — escalate with a quit-specific mandate; a single stray phrase does not. A separate **success-claim** detector catches "Done!" / "that should work" / "all tests pass" while failures are still in the window and demands observable evidence before the task ends; a successful tool call clears it. When a pivot fires, the pivot message asks the agent to restate the goal and the one piece of evidence that would prove it done.
 
 A **genuine blocker** detected in tool output (permission denied, 401/403, missing credentials) outranks every persistence tier: pivoting stops and the agent is told to report the blocker and ask the user. There is no automatic path past a real blocker.
 
@@ -45,6 +54,10 @@ Tool failures are counted per session and stored in a rolling window. When the w
 - A failed pivot marks its strategy **ineffective** for those failures, so later coaches are told to avoid it.
 
 The budget is **3 pivots per session**; `/nii reset` clears it so you can let the agent keep trying within the bounds you set.
+
+**Interruption-safe delivery.** A pivot is claimed in durable state *before* delivery, but the budget is consumed only *after* the synthetic message is accepted. If a rate limit or provider error interrupts the process in between, resuming the same session replays that exact proposal instead of spending a pivot with nothing to show for it. A per-session async lock prevents concurrent model calls from delivering two different pivots.
+
+**Provider retries.** A bounded `retry` hook extends OpenCode's policy for 429s and transient 5xx/transport failures (exponential backoff, capped delay, max 3 retries) and vetoes clearly permanent 4xx failures so they don't burn attempts. OpenCode's own hard attempt limit still applies.
 
 ### 4. Persistent learning
 
@@ -90,7 +103,10 @@ With options:
       "package": "opencode-nii",
       "options": {
         "coachModel": { "providerID": "anthropic", "id": "claude-sonnet-4-5" },
-        "shareLearning": false
+        "shareLearning": false,
+        "retryMaxRetries": 3,
+        "retryBaseDelayMs": 1000,
+        "retryMaxDelayMs": 30000
       }
     }
   ]
@@ -99,6 +115,7 @@ With options:
 
 - `coachModel` — model used for the small strategy-coach generation. Defaults to the session's default model.
 - `shareLearning` — default `false` keeps learning scoped to the current project; `true` opts into a shared global learning store.
+- `retryMaxRetries` / `retryBaseDelayMs` / `retryMaxDelayMs` — tune the bounded retry hook (defaults: 3, 1000 ms, 30 000 ms).
 
 Confirm it is active:
 
@@ -142,7 +159,7 @@ See [ROADMAP.md](ROADMAP.md) for the full milestone plan — milestones 1 (core 
 ## Testing
 
 ```sh
-npm test           # 66 checks (unit + session-lifecycle integration)
+npm test           # 89 checks (unit + session/retry/atomic/quit integration)
 npm run pack:check # inspect tarball contents
 ```
 

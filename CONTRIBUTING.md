@@ -44,8 +44,10 @@ Keep these boundaries. In particular, keep prompt text in `playbook.ts` so the m
 Two details of the self-evolution logic need care when you change them:
 
 - Failure detection counts a failing shell command as a failure even though its event says `session.tool.success` with `metadata.exit`; a same-failure-twice pattern triggers a pivot immediately. If you add signal types, update `isToolFailure`.
-- Refusal detection scans assistant text with `isRefusal`; two refusals (or one plus a tool failure) escalate. Genuine blockers are detected separately with `isGenuineBlocker` and outrank persistence — never make that tier softer.
+- Quit detection scans assistant text with `detectQuitSignals` (refusal, handoff, partial, uncertainty) and `isSuccessClaim`. Two quit signals (or one plus a tool failure) escalate; success claims demand evidence. Genuine blockers are detected separately with `isGenuineBlocker` and outrank persistence — never make that tier softer. When adding patterns, add a test with the exact phrasing; contractions and plurals are easy to miss.
 - `state.ts` keys all durable state by project. If you add a key, include `projectScope(ctx)` in it; leaking state across projects is a correctness bug.
+- Pivot delivery is claim → deliver → finalize (`claimPivot` / `finalizePivot` in `stuck.ts`), serialized by `withLock` in `lock.ts`. Never move budget consumption before the synthetic message is accepted — that would reintroduce "pivot spent but never delivered" on interruption.
+- Retry policy lives in `retry.ts`. Keep it bounded and leave unknown errors to OpenCode's own policy.
 - When you touch `buildCoachPrompt`, preserve the diversity guard (`isDistinctEnough`) — the point is that a new approach is actually new.
 
 ## Conventions

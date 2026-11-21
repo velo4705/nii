@@ -21,6 +21,7 @@
 
 import { Plugin, Skill } from "@opencode/plugin"
 import { resolveGenerateText } from "./api"
+import { withLock } from "./lock"
 import { parseNiiCommand } from "./commands"
 import {
   fallbackProposal,
@@ -50,22 +51,27 @@ import {
   writePending,
   writeStuck,
 } from "./state"
+import { niiRetryDecision } from "./retry"
 import {
   buildCoachPrompt,
+  claimPivot,
+  detectQuitSignals,
   failureCount,
+  finalizePivot,
   isExhausted,
   isGenuineBlocker,
-  isRefusal,
+  isSuccessClaim,
   isToolFailure,
-  markPivoted,
   MAX_PIVOTS,
   recordBlocker,
   recordFailure,
   recordRefusal,
   recordSuccess,
+  recordSuccessClaim,
   shouldPivot,
   toolFailureSignature,
   toolFailureText,
+  type InflightPivot,
   type ToolOutcome,
 } from "./stuck"
 
@@ -99,10 +105,17 @@ export default Plugin.define({
       })) {
         if (event.type === "session.text.ended") {
           const textData = event.data as { sessionID?: string; text?: string }
-          if (textData.sessionID && isRefusal(textData.text ?? "")) {
-            const cur = await readStuck(ctx, textData.sessionID)
-            await writeStuck(ctx, textData.sessionID, recordRefusal(cur))
-          }
+          if (!textData.sessionID || !(await isEnabled(ctx, textData.sessionID))) continue
+          const text = textData.text ?? ""
+          const quit = detectQuitSignals(text)
+          const successClaim = isSuccessClaim(text)
+          if (quit.length === 0 && !successClaim) continue
+
+          const cur = await readStuck(ctx, textData.sessionID)
+          let next = cur
+          if (quit.length > 0) next = recordRefusal(next)
+          if (successClaim) next = recordSuccessClaim(next)
+          await writeStuck(ctx, textData.sessionID, next)
           continue
         }
         if (event.type !== "session.tool.failed" && event.type !== "session.tool.success") continue
@@ -170,50 +183,82 @@ export default Plugin.define({
 
       if (isExhausted(stuck)) return
 
-      if (shouldPivot(stuck)) {
-        // Mark before generating so concurrent calls do not spawn duplicate
-        // coaches, and remember the delivery for the diversity guard.
-        const stateAtMark = await readStuck(ctx, event.sessionID)
-        await writeStuck(ctx, event.sessionID, markPivoted(stateAtMark))
-        let proposal: string
-        try {
-          const generateText = resolveGenerateText(ctx)
-          if (!generateText) throw new Error("no one-shot generation API available")
-          const configured = ctx.options?.coachModel as { providerID: string; id: string } | undefined
-          const model = configured ?? (await ctx.model.default())
-          if (!model) throw new Error("no default model available")
+      if (stuck.inflight || shouldPivot(stuck)) {
+        await withLock(`nii:pivot:${event.sessionID}`, async () => {
+          const latest = await readStuck(ctx, event.sessionID)
+          let inflight: InflightPivot | undefined = latest.inflight
 
-          const learned = await readLearning(ctx)
-          const effective = matchingStrategies(learned, stuck.ruledOut)
-          const avoided = ineffectiveStrategies(learned, stuck.ruledOut)
-          proposal = (
-            await generateText({
-              model: { providerID: model.providerID, id: model.id },
-              prompt: buildCoachPrompt(stuck.ruledOut, effective, avoided),
-            })
-          ).text
-          if (!isDistinctEnough(proposal, stuck.pivotsTried)) {
-            proposal = fallbackProposal(stuck.ruledOut)
+          if (!inflight) {
+            if (!shouldPivot(latest)) return
+            let proposal: string
+            try {
+              const generateText = resolveGenerateText(ctx)
+              if (!generateText) throw new Error("no one-shot generation API available")
+              const configured = ctx.options?.coachModel as { providerID: string; id: string } | undefined
+              const model = configured ?? (await ctx.model.default())
+              if (!model) throw new Error("no default model available")
+
+              const learned = await readLearning(ctx)
+              const effective = matchingStrategies(learned, latest.ruledOut)
+              const avoided = ineffectiveStrategies(learned, latest.ruledOut)
+              proposal = (
+                await generateText({
+                  model: { providerID: model.providerID, id: model.id },
+                  prompt: buildCoachPrompt(latest.ruledOut, effective, avoided),
+                })
+              ).text
+              if (!isDistinctEnough(proposal, latest.pivotsTried)) {
+                proposal = fallbackProposal(latest.ruledOut)
+              }
+            } catch (error) {
+              proposal = fallbackProposal(latest.ruledOut)
+              console.error("nii: coach generation failed, using deterministic pivot", error)
+            }
+
+            inflight = { proposal, signatures: latest.ruledOut }
+            // Claim before delivery: no pivot budget is consumed yet, and a
+            // crash here simply regenerates on the next call.
+            await writeStuck(ctx, event.sessionID, claimPivot(latest, proposal, inflight.signatures))
           }
-        } catch (error) {
-          proposal = fallbackProposal(stuck.ruledOut)
-          console.error("nii: coach generation failed, using deterministic pivot", error)
-        }
 
-        const updated = await readStuck(ctx, event.sessionID)
-        await writeStuck(ctx, event.sessionID, {
-          ...updated,
-          pivotsTried: [...updated.pivotsTried, proposal].slice(-5),
-        })
-        await ctx.session.synthetic({
-          sessionID: event.sessionID,
-          text: pivotMessage(proposal, stuck.pivots + 1, MAX_PIVOTS),
-        })
-        await writePending(ctx, event.sessionID, {
-          signatures: stuck.ruledOut,
-          strategy: proposal,
+          try {
+            const beforeDelivery = await readStuck(ctx, event.sessionID)
+            await ctx.session.synthetic({
+              sessionID: event.sessionID,
+              text: pivotMessage(inflight.proposal, beforeDelivery.pivots + 1, MAX_PIVOTS),
+            })
+          } catch (error) {
+            // Keep the claim. A resumed session will replay the same pivot
+            // rather than silently spending the budget.
+            console.error("nii: pivot delivery failed; will replay it on the next call", error)
+            return
+          }
+
+          // Delivery succeeded — now, and only now, consume the budget.
+          const delivered = await readStuck(ctx, event.sessionID)
+          await writeStuck(ctx, event.sessionID, finalizePivot(delivered))
+          await writePending(ctx, event.sessionID, {
+            signatures: inflight.signatures,
+            strategy: inflight.proposal,
+          })
         })
       }
+    })
+
+    // 3b. Bounded provider-error retries. OpenCode's own policy and hard
+    //     max-attempt limit still apply; we only extend transient failures.
+    const retryOptions = {
+      maxRetries:
+        typeof ctx.options?.retryMaxRetries === "number" ? ctx.options.retryMaxRetries : undefined,
+      baseDelayMs:
+        typeof ctx.options?.retryBaseDelayMs === "number" ? ctx.options.retryBaseDelayMs : undefined,
+      maxDelayMs:
+        typeof ctx.options?.retryMaxDelayMs === "number" ? ctx.options.retryMaxDelayMs : undefined,
+    }
+    await ctx.session.hook("retry", async (event) => {
+      if (!(await isEnabled(ctx, event.sessionID))) return
+      const decision = niiRetryDecision(event.error, event.attempt, retryOptions)
+      if (decision) event.decision = decision
     })
 
     // 4. Kill switch + introspection. Gating is checked inside the context
