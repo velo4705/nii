@@ -1,9 +1,12 @@
 /**
  * Storage-backed state for NII.
  *
- * A global switch plus an optional per-session override. Storage is plugin-
- * scoped and durable, so `/nii off` survives reloads and applies to the
- * session that issued it without silently changing other sessions.
+ * The plugin can be installed once, but state is scoped to a project so that
+ * one repository's failures and learned strategies never leak into another.
+ * Sessions are scoped within a project. Enable state also has a per-session
+ * override, so `/nii off` affects only the session that issued it.
+ *
+ * Pass `options.shareLearning: true` to opt into a single global learning store.
  */
 
 type Storage = {
@@ -15,34 +18,45 @@ type Storage = {
 import type { LearningEntry } from "./learning.ts"
 import { emptyStuckState, type StuckState } from "./stuck.ts"
 
-export type NiiContext = { storage: Storage }
+export type NiiContext = {
+  storage: Storage
+  location?: { directory?: string; project?: { id?: string } }
+  options?: Record<string, unknown>
+}
 
 export type PendingPivot = { signatures: string[]; strategy: string }
 
-const GLOBAL_KEY = "nii:enabled"
-const LEARNING_KEY = "nii:learning"
-const sessionKey = (sessionID: string) => `nii:session:${sessionID}:enabled`
-const stuckKey = (sessionID: string) => `nii:stuck:${sessionID}`
-const pendingKey = (sessionID: string) => `nii:pending:${sessionID}`
+/** Stable scope identifier for storage keys. */
+export function projectScope(ctx: NiiContext): string {
+  return ctx.location?.project?.id ?? ctx.location?.directory ?? "default"
+}
+
+const keyPrefix = (ctx: NiiContext) => `nii:p:${projectScope(ctx)}`
+const enabledKey = (ctx: NiiContext) => `${keyPrefix(ctx)}:enabled`
+const learningKey = (ctx: NiiContext) =>
+  ctx.options?.shareLearning === true ? "nii:learning:shared" : `${keyPrefix(ctx)}:learning`
+const sessionKey = (ctx: NiiContext, sessionID: string) => `${keyPrefix(ctx)}:session:${sessionID}:enabled`
+const stuckKey = (ctx: NiiContext, sessionID: string) => `${keyPrefix(ctx)}:stuck:${sessionID}`
+const pendingKey = (ctx: NiiContext, sessionID: string) => `${keyPrefix(ctx)}:pending:${sessionID}`
 
 export async function isEnabled(ctx: NiiContext, sessionID: string): Promise<boolean> {
-  const override = await ctx.storage.get(sessionKey(sessionID))
+  const override = await ctx.storage.get(sessionKey(ctx, sessionID))
   if (typeof override === "boolean") return override
 
-  const global = await ctx.storage.get(GLOBAL_KEY)
-  return global !== false
+  const projectDefault = await ctx.storage.get(enabledKey(ctx))
+  return projectDefault !== false
 }
 
 export async function setSessionEnabled(ctx: NiiContext, sessionID: string, enabled: boolean): Promise<void> {
-  await ctx.storage.set(sessionKey(sessionID), enabled)
+  await ctx.storage.set(sessionKey(ctx, sessionID), enabled)
 }
 
 export async function clearSessionOverride(ctx: NiiContext, sessionID: string): Promise<void> {
-  await ctx.storage.remove(sessionKey(sessionID))
+  await ctx.storage.remove(sessionKey(ctx, sessionID))
 }
 
 export async function readStuck(ctx: NiiContext, sessionID: string): Promise<StuckState> {
-  const raw = await ctx.storage.get(stuckKey(sessionID))
+  const raw = await ctx.storage.get(stuckKey(ctx, sessionID))
   if (!raw || typeof raw !== "object") return emptyStuckState()
 
   const value = raw as Partial<StuckState>
@@ -57,20 +71,21 @@ export async function readStuck(ctx: NiiContext, sessionID: string): Promise<Stu
       ? value.pivotsTried.filter((item) => typeof item === "string")
       : [],
     refusals: typeof value.refusals === "number" ? value.refusals : 0,
+    blockers: typeof value.blockers === "number" ? value.blockers : 0,
   }
 }
 
 export async function writeStuck(ctx: NiiContext, sessionID: string, state: StuckState): Promise<void> {
-  await ctx.storage.set(stuckKey(sessionID), state)
+  await ctx.storage.set(stuckKey(ctx, sessionID), state)
 }
 
 export async function clearStuck(ctx: NiiContext, sessionID: string): Promise<void> {
-  await ctx.storage.remove(stuckKey(sessionID))
-  await ctx.storage.remove(pendingKey(sessionID))
+  await ctx.storage.remove(stuckKey(ctx, sessionID))
+  await ctx.storage.remove(pendingKey(ctx, sessionID))
 }
 
 export async function readLearning(ctx: NiiContext): Promise<LearningEntry[]> {
-  const raw = await ctx.storage.get(LEARNING_KEY)
+  const raw = await ctx.storage.get(learningKey(ctx))
   if (!Array.isArray(raw)) return []
 
   return raw
@@ -87,11 +102,11 @@ export async function readLearning(ctx: NiiContext): Promise<LearningEntry[]> {
 }
 
 export async function writeLearning(ctx: NiiContext, entries: readonly LearningEntry[]): Promise<void> {
-  await ctx.storage.set(LEARNING_KEY, entries)
+  await ctx.storage.set(learningKey(ctx), entries)
 }
 
 export async function readPending(ctx: NiiContext, sessionID: string): Promise<PendingPivot | undefined> {
-  const raw = await ctx.storage.get(pendingKey(sessionID))
+  const raw = await ctx.storage.get(pendingKey(ctx, sessionID))
   if (!raw || typeof raw !== "object") return undefined
 
   const value = raw as Partial<PendingPivot>
@@ -100,9 +115,9 @@ export async function readPending(ctx: NiiContext, sessionID: string): Promise<P
 }
 
 export async function writePending(ctx: NiiContext, sessionID: string, pending: PendingPivot): Promise<void> {
-  await ctx.storage.set(pendingKey(sessionID), pending)
+  await ctx.storage.set(pendingKey(ctx, sessionID), pending)
 }
 
 export async function clearPending(ctx: NiiContext, sessionID: string): Promise<void> {
-  await ctx.storage.remove(pendingKey(sessionID))
+  await ctx.storage.remove(pendingKey(ctx, sessionID))
 }

@@ -44,7 +44,8 @@ Keep these boundaries. In particular, keep prompt text in `playbook.ts` so the m
 Two details of the self-evolution logic need care when you change them:
 
 - Failure detection counts a failing shell command as a failure even though its event says `session.tool.success` with `metadata.exit`; a same-failure-twice pattern triggers a pivot immediately. If you add signal types, update `isToolFailure`.
-- Refusal detection scans assistant text with `isRefusal` — these claims of inability escalate the mandate before any tool fails. Add patterns there when agents start to give up in new ways.
+- Refusal detection scans assistant text with `isRefusal`; two refusals (or one plus a tool failure) escalate. Genuine blockers are detected separately with `isGenuineBlocker` and outrank persistence — never make that tier softer.
+- `state.ts` keys all durable state by project. If you add a key, include `projectScope(ctx)` in it; leaking state across projects is a correctness bug.
 - When you touch `buildCoachPrompt`, preserve the diversity guard (`isDistinctEnough`) — the point is that a new approach is actually new.
 
 ## Conventions

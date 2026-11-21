@@ -54,15 +54,18 @@ import {
   buildCoachPrompt,
   failureCount,
   isExhausted,
+  isGenuineBlocker,
   isRefusal,
   isToolFailure,
   markPivoted,
   MAX_PIVOTS,
+  recordBlocker,
   recordFailure,
   recordRefusal,
   recordSuccess,
   shouldPivot,
   toolFailureSignature,
+  toolFailureText,
   type ToolOutcome,
 } from "./stuck"
 
@@ -111,6 +114,14 @@ export default Plugin.define({
         const current = await readStuck(ctx, data.sessionID)
 
         if (isToolFailure(event.type, data)) {
+          // A genuine blocker outranks the whole persistence loop: stop trying
+          // to pivot and tell the agent to ask the user instead.
+          const failureText = `${data.error?.type ?? ""} ${toolFailureText(data)}`
+          if (isGenuineBlocker(failureText)) {
+            await writeStuck(ctx, data.sessionID, recordBlocker(current))
+            continue
+          }
+
           const pending = await readPending(ctx, data.sessionID)
           // The previous pivot did not settle the problem; do not credit it,
           // and record it as ineffective so future coaches avoid it.
@@ -168,7 +179,8 @@ export default Plugin.define({
         try {
           const generateText = resolveGenerateText(ctx)
           if (!generateText) throw new Error("no one-shot generation API available")
-          const model = await ctx.model.default()
+          const configured = ctx.options?.coachModel as { providerID: string; id: string } | undefined
+          const model = configured ?? (await ctx.model.default())
           if (!model) throw new Error("no default model available")
 
           const learned = await readLearning(ctx)

@@ -32,6 +32,13 @@ Legend:
 - **Proactive strategy hints** — when failures exist but no pivot has fired, the context hook surfaces strategies that are already known to have worked for those failures.
 - **Goal restatement on pivot** — the pivot message now asks the agent to restate the goal in one sentence and define the observable evidence that would prove it done.
 
+**Drawback fixes (post-release review):**
+
+- **Per-project state** — enable switch, streaks, and learning are keyed by project; `shareLearning: true` opts into a shared global store.
+- **Genuine blocker detection** — permission denied / 401 / 403 / missing credentials stop the pivot loop and deliver a stop-and-report mandate.
+- **Refusal tuning** — two refusals, or one refusal plus a tool failure, are required before escalating; `verify` was removed from refusal verbs to avoid blocking on "I can't verify the key" (which is handled as a genuine blocker instead).
+- **Coach model option** — `coachModel` plugin option selects the coach model; deterministic fallback covers coach/API failures.
+
 **Milestone status:** 🟢
 
 Refusals and goal restatement are additions to this milestone's acceptance criteria, added during post-release review.

@@ -9,6 +9,7 @@ import {
   FAILURE_WINDOW,
   hasRepeatedFailure,
   isExhausted,
+  isGenuineBlocker,
   isToolFailure,
   markPivoted,
   MAX_PIVOTS,
@@ -17,6 +18,7 @@ import {
   shouldPivot,
   toolFailureSignature,
   isRefusal,
+  recordBlocker,
   recordRefusal,
 } from "../.opencode/plugins/nii/stuck.ts"
 
@@ -123,6 +125,20 @@ test("refusals accumulate and reset on success", () => {
   state = recordSuccess(state)
   assert.equal(state.refusals, 0)
   assert.equal(state.recent.length, 1)
+})
+
+test("genuine blockers are detected in tool output", () => {
+  assert.equal(isGenuineBlocker("Error: permission denied for /secrets"), true)
+  assert.equal(isGenuineBlocker("401 Unauthorized"), true)
+  assert.equal(isGenuineBlocker("missing credentials"), true)
+  assert.equal(isGenuineBlocker("cat: /tmp/file: No such file"), false)
+})
+
+test("a genuine blocker stops pivoting, even at the threshold", () => {
+  const blocked = recordBlocker(failures(4))
+  assert.equal(blocked.blockers, 1)
+  assert.equal(shouldPivot(blocked), false)
+  assert.equal(shouldPivot(failures(4)), true)
 })
 
 test("the coach prompt names what failed and demands a different method", () => {

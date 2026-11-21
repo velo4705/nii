@@ -6,7 +6,7 @@
  * while the full playbook lives in the auto-invoked skill.
  */
 
-import { failureCount, type StuckState } from "./stuck.ts"
+import { failureCount, shouldEscalateRefusal, type StuckState } from "./stuck.ts"
 
 /** Short, stable mandate pushed into the agent-loop system instructions. */
 export const BASE_MANDATE = `NII — NOTHING IS IMPOSSIBLE is active for this session.
@@ -26,8 +26,17 @@ The user can disable this at any time with /nii off. Obey immediately.`
 /** Added to the system instructions after repeated failures. */
 export const STUCK_NUDGE = `NII stuckness signal: the recent tool calls failed repeatedly. Do not retry the same action with cosmetic changes. State what failed, then use the nii playbook to pick a genuinely different approach before continuing.`
 
+/**
+ * Genuine blockers take precedence over persistence: if one was observed,
+ * stop and report. This is the hard stop that keeps NII honest.
+ */
+export const BLOCKER_MANDATE = `NII blocker signal: a genuine blocker was observed (missing credential, denied permission, or similar). Stop attempting new approaches. Report the exact blocker, the evidence for it, what remains unverified, and what you need from the user. Do not try to reason past it. This is a correct outcome, not a failure of resolve.`
+
+/** Added when the agent claims inability without a genuine blocker being seen. */
+export const REFUSAL_MANDATE = `NII refusal signal: you claimed you cannot do something. First check the genuine-blocker rules in the base mandate — if one applies, stop and report with evidence now. Otherwise restate the precise obstacle, choose ONE strategy move you have not used from the nii playbook, take the smallest step, and define what would prove it worked. Do not conclude from a claim of inability alone.`
+
 /** Added once a pivot has been delivered or failures cross the threshold. */
-export const ESCALATED_MANDATE = `NII escalation: the current method is not working. Stop adjusting parameters and name the precise blocker. Choose a mechanism you have NOT used yet from the nii playbook, take the smallest step, and verify it. Do not report failure until the playbook's strategy moves are exhausted.`
+export const ESCALATED_MANDATE = `NII escalation: the current method is not working. Stop adjusting parameters and name the precise blocker. If it is a genuine blocker (missing credentials, explicit user constraint, proven limit, irreversible action), stop and report with evidence now. Otherwise choose a mechanism you have NOT used yet from the nii playbook, take the smallest step, and verify it. Do not report failure from lack of trying until the playbook's strategy moves are exhausted.`
 
 /** Added once the pivot budget is spent: persistence must stop being automatic. */
 export const EXHAUSTED_MANDATE = `NII pivot budget exhausted for this session. Stop attempting new approaches on your own. Report with evidence: what you tried, what failed, what remains unverified, and which genuine blocker applies. Ask the user before continuing. This is a correct outcome, not a failure of resolve.`
@@ -38,12 +47,14 @@ export const EXHAUSTED_MANDATE = `NII pivot budget exhausted for this session. S
  * agent stops pushing on its own.
  */
 export function motivationFor(state: StuckState, maxPivots: number): string {
-  const failures = failureCount(state)
+  // A genuine blocker outranks every persistence tier — stop, do not pivot.
+  if (state.blockers > 0) return `${BASE_MANDATE}\n\n${BLOCKER_MANDATE}`
   if (state.pivots >= maxPivots) return `${BASE_MANDATE}\n\n${EXHAUSTED_MANDATE}`
-  if (state.pivots > 0 || failures >= 3 || state.refusals > 0) {
+  if (shouldEscalateRefusal(state)) return `${BASE_MANDATE}\n\n${REFUSAL_MANDATE}`
+  if (state.pivots > 0 || failureCount(state) >= 3) {
     return `${BASE_MANDATE}\n\n${ESCALATED_MANDATE}`
   }
-  if (failures >= 2) return `${BASE_MANDATE}\n\n${STUCK_NUDGE}`
+  if (failureCount(state) >= 2) return `${BASE_MANDATE}\n\n${STUCK_NUDGE}`
   return BASE_MANDATE
 }
 

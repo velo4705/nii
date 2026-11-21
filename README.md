@@ -27,7 +27,9 @@ A directive is injected into every agent-loop model call (including tool continu
 
 All tiers carry the non-negotiables: reframe "impossible" as "not yet solved with the current approach", try genuinely different methods, and demand passing tests, a working artifact, or a cited source.
 
-A **refusal** is any assistant-text claim of inability ("I can't do this", "this is impossible") — these escalate the mandate even before a tool fails, because agents often give up by saying the wrong words. When a pivot fires, the pivot message also asks the agent to restate the goal and the one piece of evidence that would prove it done.
+A **refusal** is any assistant-text claim of inability ("I can't do this", "this is impossible"). Two refusals — or one refusal alongside a real tool failure — escalate with a refusal-specific mandate; a single stray phrase does not. When a pivot fires, the pivot message asks the agent to restate the goal and the one piece of evidence that would prove it done.
+
+A **genuine blocker** detected in tool output (permission denied, 401/403, missing credentials) outranks every persistence tier: pivoting stops and the agent is told to report the blocker and ask the user. There is no automatic path past a real blocker.
 
 ### 2. Auto-invoked playbook skill
 
@@ -46,7 +48,9 @@ The budget is **3 pivots per session**; `/nii reset` clears it so you can let th
 
 ### 4. Persistent learning
 
-When a pivot is followed by a successful tool call, the proposed strategy is stored against the failure signatures that triggered it — globally, not per session. In later sessions, matching failures cause those proven strategies to be offered to the coach as hints. Memory is capped at 50 entries; frequently reinforced strategies survive, and the oldest of equal-ranked entries is dropped first. `/nii status` reports how many strategies have been learned.
+When a pivot is followed by a successful tool call, the proposed strategy is stored against the failure signatures that triggered it. In later sessions of the **same project**, matching failures cause those proven strategies to be offered to the coach as hints. Memory is capped at 50 entries; frequently reinforced strategies survive, and the oldest of equal-ranked entries is dropped first. `/nii status` reports how many strategies have been learned.
+
+**State is scoped per project.** The plugin can be installed once globally, but its enable switch, failure streaks, and learning store are keyed by project id (or directory). Strategies learned in one repo cannot leak into another. To opt into a shared cross-project learning store, set `shareLearning: true` in plugin options.
 
 ### 5. Bounded escape hatch
 
@@ -76,6 +80,25 @@ After publication:
   "plugins": ["opencode-nii"]
 }
 ```
+
+With options:
+
+```jsonc
+{
+  "plugins": [
+    {
+      "package": "opencode-nii",
+      "options": {
+        "coachModel": { "providerID": "anthropic", "id": "claude-sonnet-4-5" },
+        "shareLearning": false
+      }
+    }
+  ]
+}
+```
+
+- `coachModel` — model used for the small strategy-coach generation. Defaults to the session's default model.
+- `shareLearning` — default `false` keeps learning scoped to the current project; `true` opts into a shared global learning store.
 
 Confirm it is active:
 
@@ -119,7 +142,7 @@ See [ROADMAP.md](ROADMAP.md) for the full milestone plan — milestones 1 (core 
 ## Testing
 
 ```sh
-npm test           # 47 checks
+npm test           # 52 checks
 npm run pack:check # inspect tarball contents
 ```
 

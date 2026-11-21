@@ -3,8 +3,10 @@ import { readFileSync } from "node:fs"
 import { test } from "node:test"
 import {
   BASE_MANDATE,
+  BLOCKER_MANDATE,
   ESCALATED_MANDATE,
   EXHAUSTED_MANDATE,
+  REFUSAL_MANDATE,
   fallbackProposal,
   HELP_TEXT,
   motivationFor,
@@ -16,11 +18,12 @@ import { emptyStuckState } from "../.opencode/plugins/nii/stuck.ts"
 
 const projectRoot = new URL("../", import.meta.url)
 
-const stuckWith = (failures: number, pivots = 0, refusals = 0) => ({
+const stuckWith = (failures: number, pivots = 0, refusals = 0, blockers = 0) => ({
   ...emptyStuckState(),
   recent: Array.from({ length: failures }, () => "shell: failed"),
   pivots,
   refusals,
+  blockers,
 })
 
 test("the mandate carries the bounded-persistence contract", () => {
@@ -66,8 +69,15 @@ test("motivation escalates with failures and pivots", () => {
   assert.equal(motivationFor(stuckWith(2, 1), 3), `${BASE_MANDATE}\n\n${ESCALATED_MANDATE}`)
 })
 
-test("a refusal escalates the mandate", () => {
-  assert.equal(motivationFor(stuckWith(1, 0, 1), 3), `${BASE_MANDATE}\n\n${ESCALATED_MANDATE}`)
+test("repeated refusals escalate with a refusal-specific mandate", () => {
+  assert.equal(motivationFor(stuckWith(0, 0, 1), 3), BASE_MANDATE)
+  assert.equal(motivationFor(stuckWith(0, 0, 2), 3), `${BASE_MANDATE}\n\n${REFUSAL_MANDATE}`)
+  assert.equal(motivationFor(stuckWith(1, 0, 1), 3), `${BASE_MANDATE}\n\n${REFUSAL_MANDATE}`)
+})
+
+test("a genuine blocker outranks persistence and stops the agent", () => {
+  assert.equal(motivationFor(stuckWith(5, 3, 9, 1), 3), `${BASE_MANDATE}\n\n${BLOCKER_MANDATE}`)
+  assert.match(BLOCKER_MANDATE, /Stop attempting new approaches/)
 })
 
 test("motivation ends with a report-and-stop mandate when the budget is spent", () => {

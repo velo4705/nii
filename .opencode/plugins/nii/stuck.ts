@@ -10,6 +10,9 @@ export const MAX_PIVOTS = 3
 export const FAILURE_WINDOW = 10
 const MAX_RULED_OUT = 8
 
+/** Number of refusals needed to escalate from text alone. */
+export const REFUSAL_ESCALATION_THRESHOLD = 2
+
 export type StuckState = {
   /** Recent tool outcomes: "" means success, otherwise a failure signature. */
   recent: string[]
@@ -24,24 +27,52 @@ export type StuckState = {
   /** Strategies already delivered, used as a diversity guard. */
   pivotsTried: string[]
   /**
-   * Claims of inability in assistant text ("I can't do this"). Increments on
-   * a refusal, resets on a successful outcome.
+   * Claims of inability in assistant text. A single claim is recorded; two
+   * (or one plus a real tool failure) escalate the mandate.
    */
   refusals: number
+  /**
+   * Genuine blockers detected in tool output — missing credentials, denied
+   * permissions, proven limits. Pivoting stops when one of these appears.
+   */
+  blockers: number
 }
 
 export const MAX_REFUSALS = 10
+export const MAX_BLOCKERS = 10
 
+/**
+ * Deliberately excludes "verify": "I can't verify the API key" is a genuine
+ * blocker, not a give-up. Those are detected by BLOCKER_PATTERNS instead.
+ */
 export const REFUSAL_PATTERNS: RegExp[] = [
-  /\b(?:i|we) cannot (?:do|fix|complete|finish|solve|run|make|verify|figure out)\b/i,
-  /\b(?:i|we) can(?:not|'t) (?:do|fix|complete|finish|solve|run|make|verify|figure out)\b/i,
+  /\b(?:i|we) cannot (?:do|fix|complete|finish|solve|run|make|figure out)\b/i,
+  /\b(?:i|we) can(?:not|'t) (?:do|fix|complete|finish|solve|run|make|figure out)\b/i,
   /\b(?:i|we) give up\b/i,
-  /\b(?:unable|impossible|not possible) to (?:do|fix|complete|finish|solve|run|make|verify)\b/i,
+  /\b(?:unable|impossible|not possible) to (?:do|fix|complete|finish|solve|run|make)\b/i,
   /\bno way to (?:do|complete|solve)\b/i,
 ]
 
 export function isRefusal(text: string): boolean {
   return REFUSAL_PATTERNS.some((pattern) => pattern.test(text))
+}
+
+/** Signals a real blocker the agent cannot be expected to reason past. */
+export const BLOCKER_PATTERNS: RegExp[] = [
+  /\bpermission denied\b/i,
+  /\baccess denied\b/i,
+  /\bunauthori[sz]ed\b/i,
+  /\b403 forbidden\b/i,
+  /\b401 unauthori[sz]ed\b/i,
+  /\bcredential(?:s)? (?:missing|not found|invalid)\b/i,
+  /\bmissing (?:api )?(?:credential|token|key)s?\b/i,
+  /\bno such (?:token|credential|permission)\b/i,
+  /\bEACCES\b/i,
+  /\bEPERM\b/i,
+]
+
+export function isGenuineBlocker(text: string): boolean {
+  return BLOCKER_PATTERNS.some((pattern) => pattern.test(text))
 }
 
 export function emptyStuckState(): StuckState {
@@ -52,6 +83,7 @@ export function emptyStuckState(): StuckState {
     ruledOut: [],
     pivotsTried: [],
     refusals: 0,
+    blockers: 0,
   }
 }
 
@@ -85,13 +117,17 @@ export function isToolFailure(eventType: string, data: ToolOutcome): boolean {
   return /Exited with code [1-9]\d*/.test(text)
 }
 
+export function toolFailureText(data: ToolOutcome): string {
+  return (
+    data.error?.message ??
+    data.content?.map((part) => part.text ?? "").join("\n") ??
+    "unknown failure"
+  )
+}
+
 export function toolFailureSignature(data: ToolOutcome): string {
   const type = data.error?.type ?? (data.metadata?.exit !== undefined ? "shell" : "tool")
-  const message =
-    data.error?.message ??
-    data.content?.map((part) => part.text ?? "").join("\n").trim() ??
-    "unknown failure"
-  return errorSignature(type, message)
+  return errorSignature(type, toolFailureText(data))
 }
 
 /** Failures in the recent window. Successes no longer erase earlier evidence. */
@@ -128,7 +164,18 @@ export function recordRefusal(state: StuckState): StuckState {
   return { ...state, refusals: Math.min(state.refusals + 1, MAX_REFUSALS) }
 }
 
+/** Genuine blockers persist until the user explicitly resets the session. */
+export function recordBlocker(state: StuckState): StuckState {
+  return { ...state, blockers: Math.min(state.blockers + 1, MAX_BLOCKERS) }
+}
+
+/** True when a refusal is strong enough to escalate the mandate. */
+export function shouldEscalateRefusal(state: StuckState): boolean {
+  return state.refusals >= REFUSAL_ESCALATION_THRESHOLD || (state.refusals > 0 && failureCount(state) > 0)
+}
+
 export function shouldPivot(state: StuckState): boolean {
+  if (state.blockers > 0) return false
   const count = failureCount(state)
   const triggered = count >= FAILURE_THRESHOLD || hasRepeatedFailure(state)
   return (
