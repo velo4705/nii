@@ -16,23 +16,33 @@ It is deliberately *bounded*. NII is not an infinite-retry loop.
 
 ## What it does
 
-### 1. Always-on mandate
+### 1. Adaptive mandate
 
-A short directive is injected into every agent-loop model call (including tool continuations) via the `context` session hook:
+A directive is injected into every agent-loop model call (including tool continuations) via the `context` session hook. Its intensity adapts to evidence of stuckness:
 
-- Reframe "impossible" as "not yet solved with the current approach."
-- Try at least three genuinely different approaches before concluding.
-- If the same action fails twice, change method.
-- Success means passing tests, a working artifact, or a cited source — never an unverified claim.
-- Prefer the smallest verifiable step.
+- **Steady** — the base mandate when things are fine.
+- **Nudged** — when the same tool actions fail repeatedly in a recent window.
+- **Escalated** — when failures cross the threshold, any strategy has been pivoted, or the agent claims it cannot do something: stop adjusting parameters, name the blocker, pick an unused playbook move, verify the smallest step.
+- **Stop** — when the pivot budget is spent: report with evidence and ask before continuing.
+
+All tiers carry the non-negotiables: reframe "impossible" as "not yet solved with the current approach", try genuinely different methods, and demand passing tests, a working artifact, or a cited source.
+
+A **refusal** is any assistant-text claim of inability ("I can't do this", "this is impossible") — these escalate the mandate even before a tool fails, because agents often give up by saying the wrong words. When a pivot fires, the pivot message also asks the agent to restate the goal and the one piece of evidence that would prove it done.
 
 ### 2. Auto-invoked playbook skill
 
-The `nii` skill carries the full methodology: a six-step recovery loop and a menu of strategy moves — decompose, change representation, search prior art, remove or add a constraint, build a minimal experiment, change the tool, and use an analogy. It also lists anti-patterns (cosmetic retries, unverified victory claims, spinning without recording what was ruled out).
+The `nii` skill carries the full methodology: a recovery loop and a menu of strategy moves. It includes a **diversity guard** against trying the same approach twice, a note that an honest stop with evidence is a successful use of the skill, and the usual anti-patterns (cosmetic retries, unverified victory claims, spinning without recording what was ruled out).
+
+Failure detection is window-based: any non-zero shell exit counts (a failing `cat` is a failure), the same failure twice in a row triggers an immediate pivot, and older outcomes fall out of the window rather than being erased by unrelated successes.
 
 ### 3. Bounded strategy pivot
 
-Tool failures are counted per session. After 3 consecutive failures the agent gets a nudge to change approach; at the failure threshold a small "coach" generation reads the recorded failure signatures and proposes one genuinely different method, which is injected as a synthetic message. The budget is **3 pivots per session**. Once exhausted, the agent is directed to stop and report what was tried and what remains unverified. A successful tool call resets the failure streak but not the pivot budget.
+Tool failures are counted per session and stored in a rolling window. When the window shows 3 failures, or the same failure twice, a "coach" generation reads the recorded failure signatures and proposes one genuinely different method, which is injected as a synthetic message. Two safety nets keep this honest:
+
+- If the coach is unavailable or proposes something too close to what was already tried, a **deterministic fallback pivot** is delivered from the playbook instead.
+- A failed pivot marks its strategy **ineffective** for those failures, so later coaches are told to avoid it.
+
+The budget is **3 pivots per session**; `/nii reset` clears it so you can let the agent keep trying within the bounds you set.
 
 ### 4. Persistent learning
 
@@ -79,7 +89,8 @@ Confirm it is active:
 | --- | --- |
 | `/nii on` | Enable the mandate for this session (clears any per-session override) |
 | `/nii off` | Disable the mandate for this session — kill switch |
-| `/nii status` | Show whether NII is active |
+| `/nii reset` | Clear the failure streak and pivot budget (keeps learning) |
+| `/nii status` | Show whether NII is active, pivots used, and last pivot |
 | `/nii help` | Show usage |
 
 Disabling takes effect on the very next model call, because the gate is checked inside the `context` hook. State is stored in plugin-scoped durable storage, so it survives reloads and applies only to the session that changed it.
@@ -103,27 +114,12 @@ CONTRIBUTING.md
 
 ## Roadmap
 
-Work is structured in phases. Each phase has observable acceptance criteria.
-
-| Phase | Goal | Acceptance criteria |
-| --- | --- | --- |
-| 0 — Repo hygiene | Docs and ignore rules | ✅ `README.md`, `CONTRIBUTING.md`, `.gitignore` present |
-| 1 — V1 safety net | Automated checks for the motivation layer | ✅ 14 checks green (mandate, playbook sync, command routing, on/off state) |
-| 2 — Stuckness → pivot | Detect repeated failure and propose a different approach | ✅ 8 more checks green; failure streak, threshold, pivot cap, and coach prompt verified; plugin reloads cleanly |
-| 3 — Persistent learning | Strategy memory across sessions | ✅ 6 more checks green; successful pivots stored globally, reused as coach hints, capped at 50 |
-| 4 — Release ready | Publishable package | ✅ MIT license, `exports`/`files`, tarball installs and loads in a fresh project |
-
-Publishing itself is intentionally not done — it needs your npm account. The name `opencode-nii` is available (the short name `nii` is already taken on npm). When ready:
-
-```sh
-npm login
-npm publish
-```
+See [ROADMAP.md](ROADMAP.md) for the full milestone plan — milestones 1 (core loop) and 2 (release) are 🟢, with live verification, domain depth, guardrails, and polish milestone 3–6 ahead.
 
 ## Testing
 
 ```sh
-npm test           # 34 checks
+npm test           # 47 checks
 npm run pack:check # inspect tarball contents
 ```
 

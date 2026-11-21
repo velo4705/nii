@@ -41,6 +41,12 @@ For live verification, use a fresh project directory with `opencode run --standa
 
 Keep these boundaries. In particular, keep prompt text in `playbook.ts` so the mandate stays easy to review.
 
+Two details of the self-evolution logic need care when you change them:
+
+- Failure detection counts a failing shell command as a failure even though its event says `session.tool.success` with `metadata.exit`; a same-failure-twice pattern triggers a pivot immediately. If you add signal types, update `isToolFailure`.
+- Refusal detection scans assistant text with `isRefusal` — these claims of inability escalate the mandate before any tool fails. Add patterns there when agents start to give up in new ways.
+- When you touch `buildCoachPrompt`, preserve the diversity guard (`isDistinctEnough`) — the point is that a new approach is actually new.
+
 ## Conventions
 
 - **Keep the mandate short and stable.** It is injected on every agent-loop model call. Long or frequently-changing text costs tokens and hurts prompt caching. Put detail in the skill, not the mandate.
@@ -80,6 +86,10 @@ Include:
 The package is `opencode-nii`, MIT-licensed. `npm pack --dry-run` must show exactly: the seven files in `.opencode/plugins/nii/`, `package.json`, `README.md`, `CONTRIBUTING.md`, and `LICENSE`. A tarball must install with `npm install <tarball>` and the installed plugin files must load from a fresh project's `.opencode/plugins/` directory.
 
 Publishing is a separate, explicit step (`npm login && npm publish`) and requires the maintainer's npm account. Do not publish as part of a normal PR.
+
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md) for the milestone plan: core loop and release are done (🟢); live-loop verification, domain depth, guardrails, and polish are 🟡/🔴 ahead. New work should reference its milestone and acceptance criteria there.
 
 ## Philosophy
 

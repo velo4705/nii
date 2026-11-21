@@ -1,8 +1,11 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import {
+  ineffectiveStrategies,
+  isDistinctEnough,
   matchingStrategies,
   MAX_LEARNING_ENTRIES,
+  recordIneffective,
   recordLearning,
   type LearningEntry,
 } from "../.opencode/plugins/nii/learning.ts"
@@ -49,6 +52,23 @@ test("matching returns each distinct strategy at most once", () => {
   ]
   assert.deepEqual(matchingStrategies(entries, ["a", "b", "c"]), ["shared", "other"])
   assert.deepEqual(matchingStrategies(entries, ["missing"]), [])
+})
+
+test("ineffective strategies are marked and excluded from matching", () => {
+  const learned = [
+    { signature: "a", strategy: "retry same thing", uses: 2, updated: 1, ineffective: false },
+    { signature: "a", strategy: "try something new", uses: 0, updated: 5, ineffective: true },
+  ]
+  assert.deepEqual(matchingStrategies(learned, ["a"]), ["retry same thing"])
+  assert.deepEqual(ineffectiveStrategies(learned, ["a"]), ["try something new"])
+  assert.deepEqual(matchingStrategies(recordIneffective([], ["b"], "x"), ["b"]), [])
+  assert.deepEqual(recordIneffective([], [], "x"), [])
+})
+
+test("diversity guard rejects near-duplicate proposals", () => {
+  assert.equal(isDistinctEnough("add a unit test file", ["add unit tests"]), false)
+  assert.equal(isDistinctEnough("switch to a different language", ["retry with python"]), true)
+  assert.equal(isDistinctEnough("anything at all", []), true)
 })
 
 test("stored strategies are truncated to a compact hint", () => {

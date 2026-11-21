@@ -23,10 +23,36 @@ export type StuckState = {
   lastPivot?: string
   /** Strategies already delivered, used as a diversity guard. */
   pivotsTried: string[]
+  /**
+   * Claims of inability in assistant text ("I can't do this"). Increments on
+   * a refusal, resets on a successful outcome.
+   */
+  refusals: number
+}
+
+export const MAX_REFUSALS = 10
+
+export const REFUSAL_PATTERNS: RegExp[] = [
+  /\b(?:i|we) cannot (?:do|fix|complete|finish|solve|run|make|verify|figure out)\b/i,
+  /\b(?:i|we) can(?:not|'t) (?:do|fix|complete|finish|solve|run|make|verify|figure out)\b/i,
+  /\b(?:i|we) give up\b/i,
+  /\b(?:unable|impossible|not possible) to (?:do|fix|complete|finish|solve|run|make|verify)\b/i,
+  /\bno way to (?:do|complete|solve)\b/i,
+]
+
+export function isRefusal(text: string): boolean {
+  return REFUSAL_PATTERNS.some((pattern) => pattern.test(text))
 }
 
 export function emptyStuckState(): StuckState {
-  return { recent: [], pivots: 0, lastPivotFailureCount: 0, ruledOut: [], pivotsTried: [] }
+  return {
+    recent: [],
+    pivots: 0,
+    lastPivotFailureCount: 0,
+    ruledOut: [],
+    pivotsTried: [],
+    refusals: 0,
+  }
 }
 
 /** Reduce an error to a compact, comparable signature. */
@@ -95,7 +121,11 @@ export function recordFailure(state: StuckState, signature: string): StuckState 
 }
 
 export function recordSuccess(state: StuckState): StuckState {
-  return { ...state, recent: [...state.recent, ""].slice(-FAILURE_WINDOW) }
+  return { ...state, recent: [...state.recent, ""].slice(-FAILURE_WINDOW), refusals: 0 }
+}
+
+export function recordRefusal(state: StuckState): StuckState {
+  return { ...state, refusals: Math.min(state.refusals + 1, MAX_REFUSALS) }
 }
 
 export function shouldPivot(state: StuckState): boolean {

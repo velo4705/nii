@@ -6,6 +6,8 @@
  * while the full playbook lives in the auto-invoked skill.
  */
 
+import { failureCount, type StuckState } from "./stuck.ts"
+
 /** Short, stable mandate pushed into the agent-loop system instructions. */
 export const BASE_MANDATE = `NII — NOTHING IS IMPOSSIBLE is active for this session.
 
@@ -35,9 +37,12 @@ export const EXHAUSTED_MANDATE = `NII pivot budget exhausted for this session. S
  * of stuckness, then deliberately falls away once the budget is spent so the
  * agent stops pushing on its own.
  */
-export function motivationFor(failures: number, pivots: number, maxPivots: number): string {
-  if (pivots >= maxPivots) return `${BASE_MANDATE}\n\n${EXHAUSTED_MANDATE}`
-  if (pivots > 0 || failures >= 3) return `${BASE_MANDATE}\n\n${ESCALATED_MANDATE}`
+export function motivationFor(state: StuckState, maxPivots: number): string {
+  const failures = failureCount(state)
+  if (state.pivots >= maxPivots) return `${BASE_MANDATE}\n\n${EXHAUSTED_MANDATE}`
+  if (state.pivots > 0 || failures >= 3 || state.refusals > 0) {
+    return `${BASE_MANDATE}\n\n${ESCALATED_MANDATE}`
+  }
   if (failures >= 2) return `${BASE_MANDATE}\n\n${STUCK_NUDGE}`
   return BASE_MANDATE
 }
@@ -55,6 +60,8 @@ export function pivotMessage(proposal: string, pivotNumber: number, maxPivots: n
   return `[NII — strategy pivot ${pivotNumber}/${maxPivots}] The current approach has failed repeatedly. Change method now.
 
 ${proposal.trim()}
+
+Goal restatement: restate in one sentence the goal you are now solving, and the one piece of observable evidence that would prove it done. If your first attempt to restate matches a failed approach, pick a different one.
 
 Verify the result with observable evidence. If this also fails, NII will propose one more different approach until the budget is spent.`
 }

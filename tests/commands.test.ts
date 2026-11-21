@@ -5,6 +5,7 @@ import { parseNiiCommand } from "../.opencode/plugins/nii/commands.ts"
 test("parses every supported /nii subcommand", () => {
   assert.equal(parseNiiCommand("on"), "on")
   assert.equal(parseNiiCommand("off"), "off")
+  assert.equal(parseNiiCommand("RESET"), "reset")
   assert.equal(parseNiiCommand("status"), "status")
   assert.equal(parseNiiCommand("help"), "help")
 })

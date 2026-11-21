@@ -56,6 +56,7 @@ export async function readStuck(ctx: NiiContext, sessionID: string): Promise<Stu
     pivotsTried: Array.isArray(value.pivotsTried)
       ? value.pivotsTried.filter((item) => typeof item === "string")
       : [],
+    refusals: typeof value.refusals === "number" ? value.refusals : 0,
   }
 }
 

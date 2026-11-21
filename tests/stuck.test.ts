@@ -16,6 +16,8 @@ import {
   recordSuccess,
   shouldPivot,
   toolFailureSignature,
+  isRefusal,
+  recordRefusal,
 } from "../.opencode/plugins/nii/stuck.ts"
 
 function failures(n: number, signature = "tool.error: boom") {
@@ -102,6 +104,25 @@ test(`the pivot budget is capped at ${MAX_PIVOTS}`, () => {
   assert.equal(isExhausted(state), true)
   state = recordFailure(state, "one more")
   assert.equal(shouldPivot(state), false)
+})
+
+test("refusals are detected in assistant text", () => {
+  assert.equal(isRefusal("I can't do this"), true)
+  assert.equal(isRefusal("we cannot complete the build"), true)
+  assert.equal(isRefusal("this is impossible to do"), true)
+  assert.equal(isRefusal("I give up"), true)
+  assert.equal(isRefusal("Nothing to refuse"), false)
+  assert.equal(isRefusal("The command completed successfully"), false)
+})
+
+test("refusals accumulate and reset on success", () => {
+  let state = emptyStuckState()
+  state = recordRefusal(state)
+  state = recordRefusal(state)
+  assert.equal(state.refusals, 2)
+  state = recordSuccess(state)
+  assert.equal(state.refusals, 0)
+  assert.equal(state.recent.length, 1)
 })
 
 test("the coach prompt names what failed and demands a different method", () => {
