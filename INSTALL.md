@@ -89,13 +89,13 @@ See [`examples/opencode.jsonc`](examples/opencode.jsonc) for all options.
 | `--global` | Alias of `--cli` |
 | `--flatpak` | Flatpak sandbox config (Linux only) |
 | `--local` | Current project only |
-| `--force` | Replace an existing, different install |
+| `--force` | Accepted for compatibility; installs replace by default |
 | `--dry-run` | Show planned changes without writing |
 | `--help` | Show usage |
 
 Flatpak path: `~/.var/app/ai.opencode.opencode/config/opencode`. Override for testing with `NII_FLATPAK_CONFIG_DIR`.
 
-Re-running the installer on an identical install is a no-op — it won't overwrite your changes unless you pass `--force`.
+Re-running the installer on an identical install is a no-op. If the destination contains an older or edited NII install, setup replaces it automatically so a published version always wins. Use `--dry-run` first if you want to see what would change.
 
 ## Verify the install
 
@@ -130,5 +130,5 @@ If your config is JSONC, the command prints the line to remove instead of rewrit
 
 - **`/nii status` says OFF** — run `/nii on` for the current session.
 - **No plugin load line in the log** — confirm the directory is `<project>/.opencode/plugins/nii` and contains `index.ts`. `opencode service restart` if the watcher missed it.
-- **"already contains a different NII install"** — you edited the copied plugin; use `--force` if you intend to replace it, or keep your edits.
+- **Setup says "Replacing existing install"** — it found an older or edited copy and is replacing it with the published version. That is the intended behavior. If you want to keep your edits, copy them elsewhere first.
 - **Model transport errors** — NII's bounded retry hook handles 429s and transient 5xx, but if the provider is fully down, sessions can hang. That is external to the plugin; resume the same session when it recovers.

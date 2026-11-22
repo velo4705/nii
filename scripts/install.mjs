@@ -83,7 +83,7 @@ Options:
   --local        install into the current project only
   --global       alias of --cli (backwards compatibility)
   --both         uninstall from both Native and Flatpak configs (default)
-  --force        overwrite an existing, different install
+  --force        accepted for compatibility; installs replace by default
   --dry-run      show what would be done without writing anything
   --help         show this message
 `)
@@ -219,14 +219,11 @@ async function sameDirectory(a, b) {
   return true
 }
 
-async function installTo(destination, { force, dryRun }) {
+async function installTo(destination, { dryRun }) {
   if (existsSync(destination)) {
     if (await sameDirectory(SOURCE, destination)) {
       console.log(`NII already installed at ${destination}`)
       return false
-    }
-    if (!force) {
-      throw new Error(`${destination} already contains a different NII install. Use --force to replace it.`)
     }
     console.log(`Replacing existing install at ${destination}`)
   } else {

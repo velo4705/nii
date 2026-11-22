@@ -214,15 +214,14 @@ test("uninstall --cli leaves the Flatpak entry intact", () => {
   }
 })
 
-test("force replaces an edited install", () => {
+test("an edited install is replaced by default", () => {
   const dir = sandbox()
   try {
     run([dir])
     const edited = join(dir, ".opencode/plugins/nii/index.ts")
     writeFileSync(edited, "// edited\n", "utf8")
 
-    assert.throws(() => run([dir]), /already contains a different NII install/)
-    const output = run([dir, "--force"])
+    const output = run([dir])
     assert.match(output, /Replacing existing install/)
     assert.equal(readFileSync(edited, "utf8"), readFileSync(join(SOURCE, "index.ts"), "utf8"))
   } finally {
