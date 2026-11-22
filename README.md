@@ -59,13 +59,24 @@ The budget is **3 pivots per session**; `/nii reset` clears it so you can let th
 
 **Provider retries.** A bounded `retry` hook extends OpenCode's policy for 429s and transient 5xx/transport failures (exponential backoff, capped delay, max 3 retries) and vetoes clearly permanent 4xx failures so they don't burn attempts. OpenCode's own hard attempt limit still applies.
 
-### 4. Persistent learning
+### 4. Bounded case-matrix validation
+
+A delivered pivot includes a validation directive requiring a bounded matrix (**max 7 cases**) across four categories:
+
+1. **Trivial / dumb** — the simplest or absurd input; failing here discards the method.
+2. **Typical** — the actual shape of the task.
+3. **Boundary** — the edge that broke earlier attempts.
+4. **Adversarial / "impossible"** — a case the method *should* fail gracefully on; claiming success here is a red flag.
+
+The agent must name each case and report **observed** tool output, not reasoning. Reported categories are detected in assistant text and stored with the learned strategy as `confidence` (fraction of the four categories covered) and explicit `bounds`. A method is never "proven for all cases" — only for the cases in its matrix. Later sessions see those bounds in coach hints and must check whether a new task falls inside them.
+
+### 5. Persistent learning
 
 When a pivot is followed by a successful tool call, the proposed strategy is stored against the failure signatures that triggered it. In later sessions of the **same project**, matching failures cause those proven strategies to be offered to the coach as hints. Memory is capped at 50 entries; frequently reinforced strategies survive, and the oldest of equal-ranked entries is dropped first. `/nii status` reports how many strategies have been learned.
 
 **State is scoped per project.** The plugin can be installed once globally, but its enable switch, failure streaks, and learning store are keyed by project id (or directory). Strategies learned in one repo cannot leak into another. To opt into a shared cross-project learning store, set `shareLearning: true` in plugin options.
 
-### 5. Bounded escape hatch
+### 6. Bounded escape hatch
 
 The mandate names genuine blockers where the agent should **stop and report with evidence**, without further attempts:
 
@@ -159,7 +170,7 @@ See [ROADMAP.md](ROADMAP.md) for the full milestone plan — milestones 1 (core 
 ## Testing
 
 ```sh
-npm test           # 104 checks (unit + session/retry/atomic/quit/integration + installer/setup/uninstall)
+npm test           # 112 checks (unit + session/retry/atomic/quit/validation + installer/setup/uninstall)
 npm run pack:check # inspect tarball contents
 ```
 

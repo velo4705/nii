@@ -47,6 +47,7 @@ Two details of the self-evolution logic need care when you change them:
 - Quit detection scans assistant text with `detectQuitSignals` (refusal, handoff, partial, uncertainty) and `isSuccessClaim`. Two quit signals (or one plus a tool failure) escalate; success claims demand evidence. Genuine blockers are detected separately with `isGenuineBlocker` and outrank persistence — never make that tier softer. When adding patterns, add a test with the exact phrasing; contractions and plurals are easy to miss.
 - `state.ts` keys all durable state by project. If you add a key, include `projectScope(ctx)` in it; leaking state across projects is a correctness bug.
 - Pivot delivery is claim → deliver → finalize (`claimPivot` / `finalizePivot` in `stuck.ts`), serialized by `withLock` in `lock.ts`. Never move budget consumption before the synthetic message is accepted — that would reintroduce "pivot spent but never delivered" on interruption.
+- Validation lives in `validation.ts`. Keep the case matrix bounded and never present a strategy as universal — store the observed bounds with the learning entry. When you add a category, add detection patterns and a report test.
 - Retry policy lives in `retry.ts`. Keep it bounded and leave unknown errors to OpenCode's own policy.
 - When you touch `buildCoachPrompt`, preserve the diversity guard (`isDistinctEnough`) — the point is that a new approach is actually new.
 

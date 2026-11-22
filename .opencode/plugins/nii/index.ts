@@ -34,10 +34,15 @@ import {
 import {
   isDistinctEnough,
   ineffectiveStrategies,
-  matchingStrategies,
   recordIneffective,
   recordLearning,
+  strategyHints,
 } from "./learning"
+import {
+  buildValidationDirective,
+  detectCaseCategories,
+  mergeValidationRecords,
+} from "./validation"
 import {
   clearPending,
   clearSessionOverride,
@@ -109,7 +114,20 @@ export default Plugin.define({
           const text = textData.text ?? ""
           const quit = detectQuitSignals(text)
           const successClaim = isSuccessClaim(text)
-          if (quit.length === 0 && !successClaim) continue
+          const categories = detectCaseCategories(text)
+          if (quit.length === 0 && !successClaim && categories.length === 0) continue
+
+          // A validation report may arrive while a pivot is pending; attach
+          // its categories so the strategy is stored with honest bounds.
+          if (categories.length > 0) {
+            const pending = await readPending(ctx, textData.sessionID)
+            if (pending) {
+              await writePending(ctx, textData.sessionID, {
+                ...pending,
+                validation: mergeValidationRecords(pending.validation, categories, text),
+              })
+            }
+          }
 
           const cur = await readStuck(ctx, textData.sessionID)
           let next = cur
@@ -152,7 +170,10 @@ export default Plugin.define({
         const pending = await readPending(ctx, data.sessionID)
         if (pending) {
           const learned = await readLearning(ctx)
-          await writeLearning(ctx, recordLearning(learned, pending.signatures, pending.strategy))
+          await writeLearning(
+            ctx,
+            recordLearning(learned, pending.signatures, pending.strategy, Date.now(), pending.validation),
+          )
           await clearPending(ctx, data.sessionID)
         }
         await writeStuck(ctx, data.sessionID, recordSuccess(current))
@@ -172,7 +193,7 @@ export default Plugin.define({
       // failure signature and no pivot has fired yet, offer them now.
       if (stuck.pivots === 0 && failureCount(stuck) >= 2 && !isExhausted(stuck)) {
         const learned = await readLearning(ctx)
-        const known = matchingStrategies(learned, stuck.ruledOut)
+        const known = strategyHints(learned, stuck.ruledOut)
         if (known.length > 0) {
           event.system.push({
             type: "text",
@@ -199,7 +220,7 @@ export default Plugin.define({
               if (!model) throw new Error("no default model available")
 
               const learned = await readLearning(ctx)
-              const effective = matchingStrategies(learned, latest.ruledOut)
+              const effective = strategyHints(learned, latest.ruledOut)
               const avoided = ineffectiveStrategies(learned, latest.ruledOut)
               proposal = (
                 await generateText({
@@ -225,7 +246,7 @@ export default Plugin.define({
             const beforeDelivery = await readStuck(ctx, event.sessionID)
             await ctx.session.synthetic({
               sessionID: event.sessionID,
-              text: pivotMessage(inflight.proposal, beforeDelivery.pivots + 1, MAX_PIVOTS),
+              text: `${pivotMessage(inflight.proposal, beforeDelivery.pivots + 1, MAX_PIVOTS)}\n\n${buildValidationDirective(stuck.ruledOut)}`,
             })
           } catch (error) {
             // Keep the claim. A resumed session will replay the same pivot

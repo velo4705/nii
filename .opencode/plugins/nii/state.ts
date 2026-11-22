@@ -17,6 +17,7 @@ type Storage = {
 
 import type { LearningEntry } from "./learning.ts"
 import { emptyStuckState, type StuckState } from "./stuck.ts"
+import { CASE_CATEGORIES, type ValidationRecord } from "./validation.ts"
 
 export type NiiContext = {
   storage: Storage
@@ -24,7 +25,11 @@ export type NiiContext = {
   options?: Record<string, unknown>
 }
 
-export type PendingPivot = { signatures: string[]; strategy: string }
+export type PendingPivot = {
+  signatures: string[]
+  strategy: string
+  validation?: ValidationRecord
+}
 
 /** Stable scope identifier for storage keys. */
 export function projectScope(ctx: NiiContext): string {
@@ -122,7 +127,23 @@ export async function readPending(ctx: NiiContext, sessionID: string): Promise<P
 
   const value = raw as Partial<PendingPivot>
   if (typeof value.strategy !== "string" || !Array.isArray(value.signatures)) return undefined
-  return { signatures: value.signatures.filter((item) => typeof item === "string"), strategy: value.strategy }
+
+  const rawValidation = value.validation
+  const validation: ValidationRecord | undefined =
+    rawValidation && typeof rawValidation === "object" && Array.isArray(rawValidation.categories)
+      ? {
+          categories: rawValidation.categories.filter((item) => CASE_CATEGORIES.includes(item)),
+          confidence: typeof rawValidation.confidence === "number" ? rawValidation.confidence : 0,
+          bounds: typeof rawValidation.bounds === "string" ? rawValidation.bounds : "unvalidated",
+          report: typeof rawValidation.report === "string" ? rawValidation.report : undefined,
+        }
+      : undefined
+
+  return {
+    signatures: value.signatures.filter((item) => typeof item === "string"),
+    strategy: value.strategy,
+    validation,
+  }
 }
 
 export async function writePending(ctx: NiiContext, sessionID: string, pending: PendingPivot): Promise<void> {

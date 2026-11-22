@@ -1,10 +1,13 @@
 /**
- * Pure strategy-learning logic for NII Phase 3.
+ * Pure strategy-learning logic for NII.
  *
  * A strategy becomes "learned" when a pivot is followed by a successful tool
- * call before another failure. It is then reused as a hint in later sessions
- * whose failures share a signature.
+ * call before another failure. It is reused as a hint in later sessions whose
+ * failures share a signature — together with the bounds observed during its
+ * case-matrix validation.
  */
+
+import type { ValidationRecord } from "./validation.ts"
 
 export const MAX_LEARNING_ENTRIES = 50
 const MAX_STRATEGY_LENGTH = 400
@@ -17,6 +20,8 @@ export type LearningEntry = {
   updated: number
   /** Set when the strategy was tried after a pivot and did not help. */
   ineffective?: boolean
+  /** Case-matrix coverage and bounds observed for this strategy. */
+  validation?: ValidationRecord
 }
 
 export function recordLearning(
@@ -24,6 +29,7 @@ export function recordLearning(
   signatures: readonly string[],
   strategy: string,
   now: number = Date.now(),
+  validation?: ValidationRecord,
 ): LearningEntry[] {
   const snippet = strategy.trim().slice(0, MAX_STRATEGY_LENGTH)
   if (!snippet || signatures.length === 0) return [...entries]
@@ -32,7 +38,14 @@ export function recordLearning(
   for (const signature of signatures) {
     const index = next.findIndex((entry) => entry.signature === signature)
     if (index === -1) {
-      next.push({ signature, strategy: snippet, uses: 1, updated: now, ineffective: false })
+      next.push({
+        signature,
+        strategy: snippet,
+        uses: 1,
+        updated: now,
+        ineffective: false,
+        validation,
+      })
     } else {
       next[index] = {
         ...next[index],
@@ -40,6 +53,7 @@ export function recordLearning(
         uses: next[index].uses + 1,
         updated: now,
         ineffective: false,
+        validation: validation ?? next[index].validation,
       }
     }
   }
@@ -86,6 +100,22 @@ export function matchingStrategies(
     .map((entry) => entry.strategy)
 
   return [...new Set(matched)].slice(0, 3)
+}
+
+/** Coach hints that include observed bounds, not just the strategy name. */
+export function strategyHints(
+  entries: readonly LearningEntry[],
+  signatures: readonly string[],
+): string[] {
+  const hints = entries
+    .filter((entry) => !entry.ineffective && signatures.includes(entry.signature))
+    .map((entry) =>
+      entry.validation
+        ? `${entry.strategy} (confidence ${entry.validation.confidence}: ${entry.validation.bounds})`
+        : `${entry.strategy} (unvalidated — verify its case matrix before trusting it)`,
+    )
+
+  return [...new Set(hints)].slice(0, 3)
 }
 
 export function ineffectiveStrategies(

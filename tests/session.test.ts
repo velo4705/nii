@@ -50,7 +50,9 @@ import {
   matchingStrategies,
   recordIneffective,
   recordLearning,
+  strategyHints,
 } from "../.opencode/plugins/nii/learning.ts"
+import { mergeValidationRecords } from "../.opencode/plugins/nii/validation.ts"
 
 type Harness = {
   ctx: NiiContext
@@ -100,7 +102,13 @@ async function succeed(h: Harness) {
   if (pending) {
     await writeLearning(
       h.ctx,
-      recordLearning(await readLearning(h.ctx), pending.signatures, pending.strategy),
+      recordLearning(
+        await readLearning(h.ctx),
+        pending.signatures,
+        pending.strategy,
+        Date.now(),
+        pending.validation,
+      ),
     )
     await clearPending(h.ctx, h.sessionID)
   }
@@ -191,6 +199,38 @@ test("a successful pivot becomes a hint for later sessions in the same project",
   const elsewhere = harness("project-b", "ses-3")
   await fail(elsewhere, "shell: three")
   assert.equal((await readLearning(elsewhere.ctx)).length, 0)
+})
+
+test("a validation report is stored with the learned strategy and its bounds", async () => {
+  const h = harness()
+  await fail(h, "shell: one")
+  await fail(h, "shell: two")
+  await fail(h, "shell: three")
+  assert.equal(await pivot(h, "switch to streaming parser"), true)
+
+  let pending = await readPending(h.ctx, h.sessionID)
+  assert.ok(pending)
+  pending = {
+    ...pending,
+    validation: mergeValidationRecords(
+      pending.validation,
+      ["trivial", "typical", "boundary", "adversarial"],
+      "trivial: pass; typical: pass; boundary: pass; adversarial: failed gracefully",
+    ),
+  }
+  await writePending(h.ctx, h.sessionID, pending)
+
+  await succeed(h)
+  const learned = await readLearning(h.ctx)
+  assert.equal(learned.length, 3)
+  for (const entry of learned) {
+    assert.equal(entry.validation?.confidence, 1)
+    assert.match(entry.validation!.bounds, /validated on: trivial, typical, boundary, adversarial/)
+  }
+
+  const hint = strategyHints(learned, learned[0]!.signature)[0]!
+  assert.match(hint, /confidence 1/)
+  assert.match(hint, /validated on:/)
 })
 
 test("a failed pivot is marked ineffective in that project", async () => {
