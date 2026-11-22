@@ -251,21 +251,32 @@ test("a failed pivot is marked ineffective in that project", async () => {
   )
 })
 
-test("the pivot budget caps at three and /nii reset clears it", async () => {
+test("a configured pivot cap stops eventually, and reset clears it", async () => {
   const h = harness()
-  for (let i = 1; i <= MAX_PIVOTS; i++) {
+  for (let i = 1; i <= 3; i++) {
     for (let j = 1; j <= 3; j++) await fail(h, `shell: round-${i}-${j}`)
     assert.equal(await pivot(h, `strategy ${i}`), true)
   }
   const exhausted = await readStuck(h.ctx, h.sessionID)
-  assert.equal(isExhausted(exhausted), true)
-  assert.equal((await mandate(h)).includes(EXHAUSTED_MANDATE), true)
+  assert.equal(isExhausted(exhausted, 3), true)
+  assert.equal(motivationFor(exhausted, 3).includes(EXHAUSTED_MANDATE), true)
 
   await setSessionEnabled(h.ctx, h.sessionID, false)
   await clearStuck(h.ctx, h.sessionID)
   assert.deepEqual(await readStuck(h.ctx, h.sessionID), emptyStuckState())
   assert.equal(await isEnabled(h.ctx, h.sessionID), false)
-  assert.equal((await mandate(h)).includes(EXHAUSTED_MANDATE), false)
+  assert.equal(motivationFor(await readStuck(h.ctx, h.sessionID), 3).includes(EXHAUSTED_MANDATE), false)
+})
+
+test("pivoting keeps going without a configured cap", async () => {
+  const h = harness()
+  for (let i = 1; i <= 6; i++) {
+    for (let j = 1; j <= 3; j++) await fail(h, `shell: free-${i}-${j}`)
+    assert.equal(await pivot(h, `strategy ${i}`), true)
+  }
+  const stuck = await readStuck(h.ctx, h.sessionID)
+  assert.equal(stuck.pivots, 6)
+  assert.equal(isExhausted(stuck), false)
 })
 
 test("handoff, partial, and uncertainty text all escalate like a refusal", async () => {
@@ -347,7 +358,7 @@ test("a duplicate coach proposal falls back to the deterministic playbook pivot"
   const proposal = accepted ? duplicate : fallbackProposal(ruledOut)
   assert.equal(await pivot(h, proposal), true)
   const msg = pivotMessage(proposal, 1, MAX_PIVOTS)
-  assert.match(msg, /\[NII — strategy pivot 1\/3\]/)
+  assert.match(msg, /\[NII — strategy pivot 1\]/)
   assert.match(msg, /Goal restatement/)
   assert.match(proposal, /playbook directly/)
   assert.match(proposal, /Already failed: shell: one/)

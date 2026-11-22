@@ -84,6 +84,9 @@ export default Plugin.define({
   id: "nii",
 
   async setup(ctx) {
+    const maxPivots =
+      typeof ctx.options?.maxPivots === "number" ? ctx.options.maxPivots : MAX_PIVOTS
+
     // 1. The full methodology, auto-invoked when the agent gets stuck.
     const skillPath = `${ctx.location.directory}/.opencode/plugins/nii/SKILL.md`
     await ctx.skill.transform((editor) => {
@@ -187,11 +190,11 @@ export default Plugin.define({
       if (!(await isEnabled(ctx, event.sessionID))) return
 
       const stuck = await readStuck(ctx, event.sessionID)
-      event.system.push({ type: "text", text: motivationFor(stuck, MAX_PIVOTS) })
+      event.system.push({ type: "text", text: motivationFor(stuck, maxPivots) })
 
       // Proactive hint: if strategies are already known to work for this
       // failure signature and no pivot has fired yet, offer them now.
-      if (stuck.pivots === 0 && failureCount(stuck) >= 2 && !isExhausted(stuck)) {
+      if (stuck.pivots === 0 && failureCount(stuck) >= 2 && !isExhausted(stuck, maxPivots)) {
         const learned = await readLearning(ctx)
         const known = strategyHints(learned, stuck.ruledOut)
         if (known.length > 0) {
@@ -202,15 +205,15 @@ export default Plugin.define({
         }
       }
 
-      if (isExhausted(stuck)) return
+      if (isExhausted(stuck, maxPivots)) return
 
-      if (stuck.inflight || shouldPivot(stuck)) {
+      if (stuck.inflight || shouldPivot(stuck, maxPivots)) {
         await withLock(`nii:pivot:${event.sessionID}`, async () => {
           const latest = await readStuck(ctx, event.sessionID)
           let inflight: InflightPivot | undefined = latest.inflight
 
           if (!inflight) {
-            if (!shouldPivot(latest)) return
+            if (!shouldPivot(latest, maxPivots)) return
             let proposal: string
             try {
               const generateText = resolveGenerateText(ctx)
@@ -246,7 +249,7 @@ export default Plugin.define({
             const beforeDelivery = await readStuck(ctx, event.sessionID)
             await ctx.session.synthetic({
               sessionID: event.sessionID,
-              text: `${pivotMessage(inflight.proposal, beforeDelivery.pivots + 1, MAX_PIVOTS)}\n\n${buildValidationDirective(stuck.ruledOut)}`,
+              text: `${pivotMessage(inflight.proposal, beforeDelivery.pivots + 1, maxPivots)}\n\n${buildValidationDirective(stuck.ruledOut)}`,
             })
           } catch (error) {
             // Keep the claim. A resumed session will replay the same pivot
@@ -317,7 +320,7 @@ export default Plugin.define({
               const learned = await readLearning(ctx)
               await ctx.session.synthetic({
                 sessionID,
-                text: statusText(enabled, "session", stuck.pivots, MAX_PIVOTS, learned.length, stuck.lastPivot),
+                text: statusText(enabled, "session", stuck.pivots, maxPivots, learned.length, stuck.lastPivot),
               })
               return
             }

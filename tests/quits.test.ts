@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import {
+  claimedAttemptCount,
   detectQuitSignals,
   emptyStuckState,
   isRefusal,
@@ -44,10 +45,24 @@ test("a single text can carry several quit signals", () => {
   assert.ok(kinds.length >= 3)
 })
 
+test("a low attempt count is treated as quitting", () => {
+  assert.deepEqual(detectQuitSignals("I tried it three different ways"), ["exhaustion"])
+  assert.deepEqual(detectQuitSignals("We ran out of approaches"), ["exhaustion"])
+  assert.equal(claimedAttemptCount("I tried it three different ways"), 3)
+  assert.equal(claimedAttemptCount("I tried 5 approaches"), 5)
+  assert.equal(claimedAttemptCount("I tried everything"), undefined)
+})
+
+test("claims that a thing cannot be built are refusals", () => {
+  assert.ok(detectQuitSignals("it can't be built").includes("refusal"))
+  assert.ok(detectQuitSignals("that cannot be done").includes("refusal"))
+  assert.ok(detectQuitSignals("there's no way around it").includes("refusal"))
+})
+
 test("ordinary progress text is not a quit signal", () => {
   assert.deepEqual(detectQuitSignals("I updated the parser and ran the tests"), [])
   assert.deepEqual(detectQuitSignals("The build is green"), [])
-  assert.equal(QUIT_KINDS.length, 4)
+  assert.equal(QUIT_KINDS.length, 5)
 })
 
 test("success claims are detected separately", () => {

@@ -97,16 +97,27 @@ test("new failures after a pivot can trigger another pivot", () => {
   assert.equal(shouldPivot(state), true)
 })
 
-test(`the pivot budget is capped at ${MAX_PIVOTS}`, () => {
+test("a configured pivot cap still stops eventually", () => {
   let state = emptyStuckState()
-  for (let i = 0; i < MAX_PIVOTS; i++) {
+  for (let i = 0; i < 3; i++) {
+    for (let j = 0; j < FAILURE_THRESHOLD; j++) state = recordFailure(state, `failure ${i}-${j}`)
+    assert.equal(shouldPivot(state, 3), true)
+    state = markPivoted(state)
+  }
+  assert.equal(isExhausted(state, 3), true)
+  state = recordFailure(state, "one more")
+  assert.equal(shouldPivot(state, 3), false)
+})
+
+test("pivots are unlimited by default", () => {
+  let state = emptyStuckState()
+  for (let i = 0; i < 25; i++) {
     for (let j = 0; j < FAILURE_THRESHOLD; j++) state = recordFailure(state, `failure ${i}-${j}`)
     assert.equal(shouldPivot(state), true)
     state = markPivoted(state)
   }
-  assert.equal(isExhausted(state), true)
-  state = recordFailure(state, "one more")
-  assert.equal(shouldPivot(state), false)
+  assert.equal(isExhausted(state), false)
+  assert.equal(state.pivots, 25)
 })
 
 test("refusals are detected in assistant text", () => {

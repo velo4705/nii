@@ -6,7 +6,12 @@
  */
 
 export const FAILURE_THRESHOLD = 3
-export const MAX_PIVOTS = 3
+/** Zero means no ceiling: keep generating approaches until one works. */
+export const MAX_PIVOTS = 0
+
+export function isUnlimitedPivots(maxPivots: number): boolean {
+  return maxPivots <= 0
+}
 export const FAILURE_WINDOW = 10
 const MAX_RULED_OUT = 8
 
@@ -18,7 +23,9 @@ export type StuckState = {
   recent: string[]
   /** Strategy pivots already issued in this session. */
   pivots: number
-  /** Failure count at which the last pivot was issued. */
+  /** Total failures seen, never trimmed by the window. */
+  totalFailures: number
+  /** Total-failure count at which the last pivot was issued. */
   lastPivotFailureCount: number
   /** Short signatures of approaches/errors already observed. */
   ruledOut: string[]
@@ -66,7 +73,10 @@ export const QUIT_PATTERNS = {
   refusal: [
     /\b(?:i|we) cannot (?:do|fix|complete|finish|solve|run|make|figure out)\b/i,
     /\b(?:i|we) can(?:not|'t) (?:do|fix|complete|finish|solve|run|make|figure out)\b/i,
-    /\bimpossible to (?:do|fix|complete|finish|solve|run|make)\b/i,
+    /\b(?:it|that|this) can(?:not|'t) be (?:done|built|implemented|finished|solved)\b/i,
+    /\bimpossible to (?:do|fix|complete|finish|solve|run|make|build)\b/i,
+    /\bno way (?:to|around)\b/i,
+    /\bnot feasible\b/i,
   ],
   handoff: [
     /\b(?:i|we) (?:give up|need (?:a|the) human|need you to (?:do|handle|finish))\b/i,
@@ -85,6 +95,11 @@ export const QUIT_PATTERNS = {
     /\bno idea (?:how|what|why)\b/i,
     /\bbeyond (?:my|our) (?:capabilit(?:y|ies)|abilities|scope)\b/i,
   ],
+  // Treating a small attempt count as a reason to stop is a quit signal.
+  exhaustion: [
+    /\b(?:tried|attempted|tested)\s+(?:it\s+)?(?:two|three|2|3|a few|several)\s+(?:different\s+)?(?:ways|approaches|methods|times)\b/i,
+    /\b(?:out of|no more|ran out of) (?:ideas|options|approaches|methods)\b/i,
+  ],
 } as const
 
 export type QuitKind = keyof typeof QUIT_PATTERNS
@@ -93,6 +108,17 @@ export const QUIT_KINDS = Object.keys(QUIT_PATTERNS) as QuitKind[]
 
 export function detectQuitSignals(text: string): QuitKind[] {
   return QUIT_KINDS.filter((kind) => QUIT_PATTERNS[kind].some((pattern) => pattern.test(text)))
+}
+
+/** Pull a stated attempt count out of text like "I tried it three ways". */
+export function claimedAttemptCount(text: string): number | undefined {
+  const match = text.match(
+    /\b(?:tried|attempted|tested)\s+(?:it\s+)?(one|two|three|four|five|\d+)\s+(?:different\s+)?(?:ways|approaches|methods|times)\b/i,
+  )
+  if (!match) return undefined
+  const word = match[1]!.toLowerCase()
+  const named = { one: 1, two: 2, three: 3, four: 4, five: 5 } as Record<string, number>
+  return named[word] ?? Number(word)
 }
 
 /** Backwards-compatible: any text-based quitting signal. */
@@ -134,6 +160,7 @@ export function emptyStuckState(): StuckState {
   return {
     recent: [],
     pivots: 0,
+    totalFailures: 0,
     lastPivotFailureCount: 0,
     ruledOut: [],
     pivotsTried: [],
@@ -208,6 +235,7 @@ export function recordFailure(state: StuckState, signature: string): StuckState 
   return {
     ...state,
     recent: [...state.recent, signature].slice(-FAILURE_WINDOW),
+    totalFailures: state.totalFailures + 1,
     ruledOut,
   }
 }
@@ -244,20 +272,20 @@ export function shouldEscalateRefusal(state: StuckState): boolean {
   return state.refusals >= REFUSAL_ESCALATION_THRESHOLD || (state.refusals > 0 && failureCount(state) > 0)
 }
 
-export function shouldPivot(state: StuckState): boolean {
+export function shouldPivot(state: StuckState, maxPivots = MAX_PIVOTS): boolean {
   if (state.blockers > 0 || state.inflight) return false
   const count = failureCount(state)
   const triggered = count >= FAILURE_THRESHOLD || hasRepeatedFailure(state)
   return (
     triggered &&
-    count > state.lastPivotFailureCount &&
-    state.pivots < MAX_PIVOTS
+    state.totalFailures > state.lastPivotFailureCount &&
+    (isUnlimitedPivots(maxPivots) || state.pivots < maxPivots)
   )
 }
 
 /** Used by tests and simple callers; production code uses claim/finalize. */
 export function markPivoted(state: StuckState): StuckState {
-  return { ...state, pivots: state.pivots + 1, lastPivotFailureCount: failureCount(state) }
+  return { ...state, pivots: state.pivots + 1, lastPivotFailureCount: state.totalFailures }
 }
 
 /** Claim a pivot before delivery. No budget is consumed yet. */
@@ -276,7 +304,7 @@ export function finalizePivot(state: StuckState): StuckState {
   return {
     ...state,
     pivots: state.pivots + 1,
-    lastPivotFailureCount: failureCount(state),
+    lastPivotFailureCount: state.totalFailures,
     pivotsTried: [...state.pivotsTried, pending.proposal].slice(-5),
     lastPivot: pending.proposal,
     inflight: undefined,
@@ -287,8 +315,8 @@ export function clearInflight(state: StuckState): StuckState {
   return { ...state, inflight: undefined }
 }
 
-export function isExhausted(state: StuckState): boolean {
-  return state.pivots >= MAX_PIVOTS
+export function isExhausted(state: StuckState, maxPivots = MAX_PIVOTS): boolean {
+  return !isUnlimitedPivots(maxPivots) && state.pivots >= maxPivots
 }
 
 export function buildCoachPrompt(

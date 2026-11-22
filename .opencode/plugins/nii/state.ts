@@ -68,6 +68,7 @@ export async function readStuck(ctx: NiiContext, sessionID: string): Promise<Stu
   return {
     recent: Array.isArray(value.recent) ? value.recent.filter((item) => typeof item === "string") : [],
     pivots: typeof value.pivots === "number" ? value.pivots : 0,
+    totalFailures: typeof value.totalFailures === "number" ? value.totalFailures : 0,
     lastPivotFailureCount:
       typeof value.lastPivotFailureCount === "number" ? value.lastPivotFailureCount : 0,
     ruledOut: Array.isArray(value.ruledOut) ? value.ruledOut.filter((item) => typeof item === "string") : [],

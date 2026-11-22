@@ -6,7 +6,14 @@
  * while the full playbook lives in the auto-invoked skill.
  */
 
-import { failureCount, needsVerification, shouldEscalateRefusal, type StuckState } from "./stuck.ts"
+import {
+  failureCount,
+  isExhausted,
+  isUnlimitedPivots,
+  needsVerification,
+  shouldEscalateRefusal,
+  type StuckState,
+} from "./stuck.ts"
 
 /** Short, stable mandate pushed into the agent-loop system instructions. */
 export const BASE_MANDATE = `NII — NOTHING IS IMPOSSIBLE is active for this session.
@@ -14,7 +21,7 @@ export const BASE_MANDATE = `NII — NOTHING IS IMPOSSIBLE is active for this se
 Treat "impossible" as "not yet solved with the current approach." Do not abandon a task merely because it looks impossible or because one attempt failed.
 
 Rules:
-- Before concluding, try at least three genuinely different approaches. Changing a parameter or re-running the same command is not a new approach.
+- Three genuinely different approaches is the floor, not the limit. If three fail, generate more. Changing a parameter or re-running the same command is not a new approach.
 - If the same action fails twice, stop repeating it and switch method.
 - Success means observable evidence: passing tests, a working artifact, or a cited source. Never claim success without it.
 - Prefer the smallest verifiable step over a perfect plan.
@@ -33,13 +40,13 @@ export const STUCK_NUDGE = `NII stuckness signal: the recent tool calls failed r
 export const BLOCKER_MANDATE = `NII blocker signal: a genuine blocker was observed (missing credential, denied permission, or similar). Stop attempting new approaches. Report the exact blocker, the evidence for it, what remains unverified, and what you need from the user. Do not try to reason past it. This is a correct outcome, not a failure of resolve.`
 
 /** Added when the agent claims inability, hands the task off, or gives a partial answer. */
-export const REFUSAL_MANDATE = `NII quit signal: you claimed you cannot do this, handed it to the user, or offered only a partial result. First check the genuine-blocker rules in the base mandate — if one applies, stop and report with evidence now. Otherwise restate the precise obstacle, choose ONE strategy move you have not used from the nii playbook, take the smallest step, and define what would prove it worked. Do not conclude from a claim of inability, a handoff, or a partial answer alone.`
+export const REFUSAL_MANDATE = `NII quit signal: you claimed you cannot do this, handed it to the user, offered only a partial result, or stopped because you had tried only a few approaches. First check the genuine-blocker rules in the base mandate — if one applies, stop and report with evidence now. Otherwise restate the precise obstacle, choose ONE strategy move you have not used from the nii playbook, take the smallest step, and define what would prove it worked. Three attempts is where the search starts, not where it ends. A small count is not proof that a task cannot be done.`
 
 /** Added when the agent declares success while failures remain in the window. */
 export const VERIFY_MANDATE = `NII verification signal: you claimed success, but the recent window still contains failed attempts. Do not conclude the task yet. Show the observable evidence for each claim — test output, a working artifact, or a cited source. If you cannot produce it, treat the task as not-yet-solved and continue with an unused strategy move.`
 
 /** Added once a pivot has been delivered or failures cross the threshold. */
-export const ESCALATED_MANDATE = `NII escalation: the current method is not working. Stop adjusting parameters and name the precise blocker. If it is a genuine blocker (missing credentials, explicit user constraint, proven limit, irreversible action), stop and report with evidence now. Otherwise choose a mechanism you have NOT used yet from the nii playbook, take the smallest step, and verify it. Do not report failure from lack of trying until the playbook's strategy moves are exhausted.`
+export const ESCALATED_MANDATE = `NII escalation: the current method is not working. Stop adjusting parameters and name the precise blocker. If it is a genuine blocker (missing credentials, explicit user constraint, proven limit, irreversible action), stop and report with evidence now. Otherwise choose a mechanism you have NOT used yet from the nii playbook, take the smallest step, and verify it. Having tried three ways means you have barely started. Keep generating new ones until one works or a real blocker appears. If this session was interrupted, continue from the approaches already recorded and keep going. Do not restart from scratch.`
 
 /** Added once the pivot budget is spent: persistence must stop being automatic. */
 export const EXHAUSTED_MANDATE = `NII pivot budget exhausted for this session. Stop attempting new approaches on your own. Report with evidence: what you tried, what failed, what remains unverified, and which genuine blocker applies. Ask the user before continuing. This is a correct outcome, not a failure of resolve.`
@@ -52,7 +59,7 @@ export const EXHAUSTED_MANDATE = `NII pivot budget exhausted for this session. S
 export function motivationFor(state: StuckState, maxPivots: number): string {
   // A genuine blocker outranks every persistence tier — stop, do not pivot.
   if (state.blockers > 0) return `${BASE_MANDATE}\n\n${BLOCKER_MANDATE}`
-  if (state.pivots >= maxPivots) return `${BASE_MANDATE}\n\n${EXHAUSTED_MANDATE}`
+  if (isExhausted(state, maxPivots)) return `${BASE_MANDATE}\n\n${EXHAUSTED_MANDATE}`
   if (needsVerification(state)) return `${BASE_MANDATE}\n\n${VERIFY_MANDATE}`
   if (shouldEscalateRefusal(state)) return `${BASE_MANDATE}\n\n${REFUSAL_MANDATE}`
   if (state.pivots > 0 || failureCount(state) >= 3) {
@@ -72,7 +79,11 @@ Pick ONE strategy move you have not used yet: decompose the goal; change represe
 }
 
 export function pivotMessage(proposal: string, pivotNumber: number, maxPivots: number): string {
-  return `[NII — strategy pivot ${pivotNumber}/${maxPivots}] The current approach has failed repeatedly. Change method now.
+  const label = isUnlimitedPivots(maxPivots)
+    ? `[NII — strategy pivot ${pivotNumber}]`
+    : `[NII — strategy pivot ${pivotNumber}/${maxPivots}]`
+
+  return `${label} The current approach has failed repeatedly. Change method now.
 
 ${proposal.trim()}
 
@@ -94,7 +105,7 @@ Use this skill when a task looks impossible, after repeated failures, or wheneve
 
 1. Name the blocker precisely — "cannot do X" is not a blocker; "tool Y rejects input Z because of reason R" is.
 2. Restate the goal as a verifiable outcome — what observable evidence would prove it done?
-3. List three approaches that are *genuinely* different (different mechanism, not different parameters).
+3. List at least three approaches that are *genuinely* different (different mechanism, not different parameters). If all three fail, list three more. Three is a floor, not a stopping rule.
 4. Take the smallest step of the most promising approach.
 5. Verify against the evidence from step 2. Do not accept your own assertion of success.
 6. If it failed, record why, remove that approach from the list, and go back to step 3.
@@ -154,7 +165,10 @@ export function statusText(
   learned?: number,
   lastPivot?: string,
 ): string {
-  const budget = pivots === undefined || maxPivots === undefined ? "" : `\n\nStrategy pivots used: ${pivots}/${maxPivots}.`
+  const budget =
+    pivots === undefined || maxPivots === undefined
+      ? ""
+      : `\n\nStrategy pivots used: ${pivots}${isUnlimitedPivots(maxPivots) ? " (no limit)" : `/${maxPivots}`}.`
   const memory = learned === undefined ? "" : `\nStrategies learned: ${learned}.`
   const recent = lastPivot ? `\nLast pivot: ${lastPivot.slice(0, 160)}` : ""
 

@@ -80,7 +80,9 @@ Refusals and goal restatement are additions to this milestone's acceptance crite
 
 **Goal:** Observe a real agent get 3 tool failures, receive a `[NII — strategy pivot]` message, and complete a follow-up step — the full chain, observed, not just unit-tested.
 
-**Milestone status:** 🔴 (blocked by external model-API outage)
+**Milestone status:** 🔴 for the full chain, with partial live evidence.
+
+Observed by the maintainer on a real hard task: the agent invoked NII and kept working until the feature worked. It then concluded after "I tried it three different ways" and claimed the task could not be done. That confirms the motivation layer in a real session and exposed the low-count give-up, which is fixed in this release. The pivot message itself has not been captured in a live transcript yet.
 
 **Acceptance criteria:**
 
@@ -141,7 +143,7 @@ Refusals and goal restatement are additions to this milestone's acceptance crite
 ## Backlog (unscheduled ideas)
 
 - Replace `ctx.model.default()` for the coach with a per-plugin option (`coachModel`) — tunable per project.
-- Make effective/ineffective thresholds plugin options via `ctx.options` (`threshold`, `maxPivots`, `window`).
+- Make effective/ineffective thresholds plugin options via `ctx.options` (`threshold`, `window`). `maxPivots` is already configurable.
 - Add optional payload for `/nii` command when called with a goal: `/nii pivot <goal>` seeds goal context for the next pivot.
 - TUI improvements: highlight system-injection in OpenCode's UI.
 - Docker/shell-level tests for the fallback pivot path (coach mocked to fail).

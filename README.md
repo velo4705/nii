@@ -67,7 +67,9 @@ Two things keep this bounded:
 - If the coach is unavailable or proposes something too close to what was tried, the playbook supplies a deterministic fallback pivot.
 - A failed pivot marks its strategy ineffective for those failures, so later coaches avoid it.
 
-The budget is three pivots per session. `/nii reset` clears it.
+There is no default pivot ceiling. The agent keeps generating different approaches until one works or a genuine blocker appears. `maxPivots` is only there if you want a hard stop for your own reasons; `0` means unlimited. Three failed approaches is the floor for concluding anything, not the ceiling. `/nii reset` clears any cap you set.
+
+An interrupted session keeps its place. Streaks, pivot claims and learned strategies live in durable storage, so answering "continue" picks up the same journey instead of starting over. If a pivot was claimed but not delivered, the next model call replays that exact proposal.
 
 The plugin claims a pivot in durable state before delivery. It spends the budget only after the synthetic message is accepted. If a rate limit or provider error interrupts the process in between, resuming the same session replays that proposal rather than spending a pivot with nothing delivered. A per-session async lock stops concurrent model calls from delivering two different pivots.
 
@@ -129,6 +131,7 @@ With options:
       "options": {
         "coachModel": { "providerID": "anthropic", "id": "claude-sonnet-4-5" },
         "shareLearning": false,
+        "maxPivots": 0,
         "retryMaxRetries": 3,
         "retryBaseDelayMs": 1000,
         "retryMaxDelayMs": 30000
@@ -140,6 +143,7 @@ With options:
 
 - `coachModel`: model used for the small strategy-coach generation. Defaults to the session's default model.
 - `shareLearning`: `false` by default keeps learning scoped to the current project; `true` uses a shared global store.
+- `maxPivots`: strategy pivots allowed per session. `0` (default) means unlimited; a positive number sets a cap.
 - `retryMaxRetries` / `retryBaseDelayMs` / `retryMaxDelayMs`: tune the bounded retry hook. Defaults: 3, 1000 ms, and 30 000 ms.
 
 Confirm it is active with `/nii status`.
@@ -180,7 +184,7 @@ See [ROADMAP.md](ROADMAP.md) for the full milestone plan. Milestones 1 (core loo
 ## Testing
 
 ```sh
-npm test           # 112 checks (unit + session/retry/atomic/quit/validation + installer/setup/uninstall)
+npm test           # 124 checks (unit + session/retry/atomic/quit/validation + installer/setup/uninstall + benchmark)
 npm run pack:check # inspect tarball contents
 ```
 
@@ -191,6 +195,8 @@ Node 24 has native TypeScript support, so there are no dependencies or build ste
 ## Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, conventions, and how to propose changes.
+
+See [BENCHMARK.md](BENCHMARK.md) for the paired benchmark harness that compares agents with and without NII.
 
 ## License
 

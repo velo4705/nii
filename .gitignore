@@ -39,6 +39,9 @@ pnpm-debug.log*
 # Packed artifacts (regenerate with `npm pack`)
 *.tgz
 
+# Generated benchmark output
+benchmark/out/
+
 # Misc
 tmp/
 temp/

@@ -9,6 +9,7 @@
       "options": {
         // Learn strategies per project (default). true = share across projects.
         "shareLearning": false,
+        "maxPivots": 0, // 0 = no ceiling; a positive number sets a cap
 
         // Model used for the small strategy-coach generation.
         // Omit to use the session's default model.

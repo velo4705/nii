@@ -10,7 +10,7 @@ Use this skill when a task looks impossible, after repeated failures, or wheneve
 
 1. Name the blocker precisely — "cannot do X" is not a blocker; "tool Y rejects input Z because of reason R" is.
 2. Restate the goal as a verifiable outcome — what observable evidence would prove it done?
-3. List three approaches that are *genuinely* different (different mechanism, not different parameters).
+3. List at least three approaches that are *genuinely* different (different mechanism, not different parameters). If all three fail, list three more. Three is a floor, not a stopping rule.
 4. Take the smallest step of the most promising approach.
 5. Verify against the evidence from step 2. Do not accept your own assertion of success.
 6. If it failed, record why, remove that approach from the list, and go back to step 3.
