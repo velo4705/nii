@@ -1,6 +1,6 @@
 {
   "name": "opencode-nii",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Nothing Is Impossible — bounded, adaptive persistence for OpenCode agents",
   "license": "MIT",
   "type": "module",
