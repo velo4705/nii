@@ -62,7 +62,28 @@ The sample generator is deterministic, so the same seed produces the same dashbo
 4. apply the task verifier;
 5. write a `Trial` record into a `Results` file, then call `report`.
 
-Live trials were blocked while the model provider was hanging. The harness is ready; only the runner needs a stable provider.
+Live trials are currently blocked by the model provider, not by the harness. Attempts made on 22 Nov 2026:
+
+- `opencode run` with `auriko/claude-sonnet-4-6`, `auriko/deepseek-v4-flash`, `google/gemini-2.5-flash-lite` and a private `--standalone` server: all timed out with no output.
+- The private server reported the actual failure: `Transport: The socket connection was closed unexpectedly.`
+- `POST /api/experimental/generate/text` returned 404; its deprecated alias `POST /api/experimental/generate` timed out with an empty response.
+
+## First live run (22 Nov 2026)
+
+After the failure above, the free provider `opencode/hy4-flash-free` worked. A real paired run was completed with `benchmark/live.ts` on four small, mechanically verifiable tasks, one trial per arm per task.
+
+| Arm | Solved | Solve rate |
+|---|---|---|
+| control | 4/4 | 100% |
+| treatment (NII) | 4/4 | 100% |
+
+All eight trials solved on the first attempt. No quit signals were recorded. The tasks were too easy, so this run demonstrates the harness works but has a ceiling effect: it cannot distinguish the arms.
+
+The run also has a instrumentation gap. The live runner writes a fixed `pivots: 0` into each treatment trial because there is no API for reading NII's plugin state from a finished `opencode run`. Since no task triggered a pivot, this did not affect the result here, but a harder suite would need real state capture.
+
+The only meaningful live evidence for NII so far remains the maintainer's observation that an agent invoked the skill and persisted on a hard task until it worked, then stopped after "I tried it three different ways." That motivated the low-count quit detection and unlimited pivots. It is a single anecdote, not a controlled comparison.
+
+Next step for a decisive result: harder tasks with a genuine failure wall, several trials per arm, and real NII state capture.
 
 ## Validity notes
 
