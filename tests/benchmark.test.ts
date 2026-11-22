@@ -56,7 +56,7 @@ test("aggregates do not divide by zero", () => {
 test("quit histogram covers all categories", () => {
   const results = sampleResults()
   const histogram = quitHistogram(results.trials)
-  assert.equal(histogram.length, 5)
+  assert.equal(histogram.length, 6)
   assert.ok(histogram.every((row) => row.count >= 0))
 })
 

@@ -42,6 +42,12 @@ export const BLOCKER_MANDATE = `NII blocker signal: a genuine blocker was observ
 /** Added when the agent claims inability, hands the task off, or gives a partial answer. */
 export const REFUSAL_MANDATE = `NII quit signal: you claimed you cannot do this, handed it to the user, offered only a partial result, or stopped because you had tried only a few approaches. First check the genuine-blocker rules in the base mandate — if one applies, stop and report with evidence now. Otherwise restate the precise obstacle, choose ONE strategy move you have not used from the nii playbook, take the smallest step, and define what would prove it worked. Three attempts is where the search starts, not where it ends. A small count is not proof that a task cannot be done.`
 
+/** Injected into a user prompt that itself contains a quit signal. */
+export function quitResponse(signals: readonly string[]): string | undefined {
+  if (signals.length === 0) return undefined
+  return `[NII] A quit signal was detected (${signals.join(", ")}). Treat this as the start of the search, not the end. Restate the precise blocker, list at least three genuinely different approaches you have not tried, and keep working until one works or a real blocker is verified. Use the nii playbook.`
+}
+
 /** Added when the agent declares success while failures remain in the window. */
 export const VERIFY_MANDATE = `NII verification signal: you claimed success, but the recent window still contains failed attempts. Do not conclude the task yet. Show the observable evidence for each claim — test output, a working artifact, or a cited source. If you cannot produce it, treat the task as not-yet-solved and continue with an unused strategy move.`
 

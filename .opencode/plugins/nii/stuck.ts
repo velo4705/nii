@@ -72,7 +72,7 @@ export const MAX_BLOCKERS = 10
 export const QUIT_PATTERNS = {
   refusal: [
     /\b(?:i|we) cannot (?:do|fix|complete|finish|solve|run|make|figure out)\b/i,
-    /\b(?:i|we) can(?:not|'t) (?:do|fix|complete|finish|solve|run|make|figure out)\b/i,
+    /\b(?:i|we) can(?:not|'t) (?:do|fix|complete|finish|solve|run|make|build|implement|get (?:it|this) to work|figure out)\b/i,
     /\b(?:it|that|this) can(?:not|'t) be (?:done|built|implemented|finished|solved)\b/i,
     /\bimpossible to (?:do|fix|complete|finish|solve|run|make|build)\b/i,
     /\bno way (?:to|around)\b/i,
@@ -99,6 +99,16 @@ export const QUIT_PATTERNS = {
   exhaustion: [
     /\b(?:tried|attempted|tested)\s+(?:it\s+)?(?:two|three|2|3|a few|several)\s+(?:different\s+)?(?:ways|approaches|methods|times)\b/i,
     /\b(?:out of|no more|ran out of) (?:ideas|options|approaches|methods)\b/i,
+  ],
+  // Announcements that the agent is winding down or refuses to continue.
+  stall: [
+    /\b(?:i|we)(?:'m| am|'re| are)?\s+(?:stuck|blocked)\b/i,
+    /\b(?:i|we)(?:'ll| will) (?:stop|leave it|leave this|end it|call it)\b/i,
+    /\b(?:i|we) can(?:not|'t) (?:continue|proceed|move forward|go on)\b/i,
+    /\bno point (?:in )?(?:continuing|trying|going on)\b/i,
+    /\b(?:this is|it's) a dead end\b/i,
+    /\bnothing (?:else )?(?:i|we) can do\b/i,
+    /\b(?:i|we)(?:'m| am) done trying\b/i,
   ],
 } as const
 

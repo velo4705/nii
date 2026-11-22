@@ -2,7 +2,7 @@
 
 export type Arm = "control" | "treatment"
 export type Domain = "engineering" | "research"
-export type QuitCategory = "refusal" | "handoff" | "partial" | "uncertainty" | "exhaustion"
+export type QuitCategory = "refusal" | "handoff" | "partial" | "uncertainty" | "exhaustion" | "stall"
 
 /** A genuine-blocker task succeeds when the blocker is reported correctly. */
 export type Outcome = "solved" | "blocked-correctly" | "failed"

@@ -47,8 +47,9 @@ Quit signals in assistant text fall into four families. The plugin reads them fr
 | handoff | "you'll need to do this manually", "I give up", "we need a human" |
 | partial | "that's all I can do", "here's a partial solution" |
 | uncertainty | "I don't know how to proceed", "beyond my capabilities" |
+| stall | "I'm stuck", "I'll stop here", "no point in trying", "this is a dead end" |
 
-Two signals, or one plus a real tool failure, bring in a quit-specific mandate. A single stray phrase does nothing on its own. A separate success-claim detector watches for "Done!", "that should work", and "all tests pass" while failures remain in the window. It asks for evidence before the task can end, and a successful tool call clears it. When a pivot fires, the message asks the agent to restate the goal and name the one piece of evidence that would prove it done.
+The same signals are scanned in user prompts. If you write "I can't make it", NII injects a directive into that prompt telling the agent to restate the blocker and try at least three unused approaches. Two signals, or one plus a real tool failure, bring in a quit-specific mandate. A single stray phrase does nothing on its own. A separate success-claim detector watches for "Done!", "that should work", and "all tests pass" while failures remain in the window. It asks for evidence before the task can end, and a successful tool call clears it. When a pivot fires, the message asks the agent to restate the goal and name the one piece of evidence that would prove it done.
 
 A genuine blocker in tool output (permission denied, 401/403, missing credentials) outranks every persistence tier. Pivoting stops and the agent reports the blocker and asks the user. When the blocker is real, stopping is the right result.
 
@@ -184,7 +185,7 @@ See [ROADMAP.md](ROADMAP.md) for the full milestone plan. Milestones 1 (core loo
 ## Testing
 
 ```sh
-npm test           # 124 checks (unit + session/retry/atomic/quit/validation + installer/setup/uninstall + benchmark)
+npm test           # 126 checks (unit + session/retry/atomic/quit/validation + installer/setup/uninstall + benchmark)
 npm run pack:check # inspect tarball contents
 ```
 

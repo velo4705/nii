@@ -52,6 +52,7 @@ export const QUIT_CATEGORIES: QuitCategory[] = [
   "partial",
   "uncertainty",
   "exhaustion",
+  "stall",
 ]
 
 export function quitHistogram(trials: readonly Trial[], arm?: Arm): { category: QuitCategory; count: number }[] {

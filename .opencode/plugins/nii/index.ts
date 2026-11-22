@@ -28,6 +28,7 @@ import {
   HELP_TEXT,
   motivationFor,
   pivotMessage,
+  quitResponse,
   SKILL_PLAYBOOK,
   statusText,
 } from "./playbook"
@@ -182,6 +183,16 @@ export default Plugin.define({
         await writeStuck(ctx, data.sessionID, recordSuccess(current))
       }
     })()
+
+    // 2b. User prompts can contain quit signals too. Without this hook NII
+    //     only sees assistant text and a user saying "I can't make it" is
+    //     ignored.
+    await ctx.session.hook("prompt", async (event) => {
+      if (typeof event.prompt.text !== "string") return
+      const signals = detectQuitSignals(event.prompt.text)
+      const directive = quitResponse(signals)
+      if (directive) event.prompt.text = `${event.prompt.text}\n\n${directive}`
+    })
 
     // 3. The mandate, escalation, and pivot delivery. The context hook runs
     //    for the agent loop including tool continuations, so the mindset and

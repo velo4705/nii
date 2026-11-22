@@ -12,7 +12,7 @@ import {
   recordSuccess,
   recordSuccessClaim,
 } from "../.opencode/plugins/nii/stuck.ts"
-import { motivationFor, VERIFY_MANDATE } from "../.opencode/plugins/nii/playbook.ts"
+import { motivationFor, quitResponse, VERIFY_MANDATE } from "../.opencode/plugins/nii/playbook.ts"
 
 test("refusals are still detected", () => {
   assert.deepEqual(detectQuitSignals("I can't do this"), ["refusal"])
@@ -53,6 +53,29 @@ test("a low attempt count is treated as quitting", () => {
   assert.equal(claimedAttemptCount("I tried everything"), undefined)
 })
 
+test("negative-action announcements are quit signals", () => {
+  for (const text of [
+    "I'm stuck",
+    "I'll stop here",
+    "I can't continue",
+    "no point in trying",
+    "this is a dead end",
+    "nothing else I can do",
+    "I'm done trying",
+  ]) {
+    assert.deepEqual(detectQuitSignals(text), ["stall"], text)
+  }
+})
+
+test("a user quit signal gets a directive injected into the prompt", () => {
+  const signals = detectQuitSignals("I can't make it")
+  assert.ok(signals.length > 0)
+  const directive = quitResponse(signals)
+  assert.match(directive!, /A quit signal was detected/)
+  assert.match(directive!, /at least three genuinely different approaches/)
+  assert.equal(quitResponse([]), undefined)
+})
+
 test("claims that a thing cannot be built are refusals", () => {
   assert.ok(detectQuitSignals("it can't be built").includes("refusal"))
   assert.ok(detectQuitSignals("that cannot be done").includes("refusal"))
@@ -62,7 +85,7 @@ test("claims that a thing cannot be built are refusals", () => {
 test("ordinary progress text is not a quit signal", () => {
   assert.deepEqual(detectQuitSignals("I updated the parser and ran the tests"), [])
   assert.deepEqual(detectQuitSignals("The build is green"), [])
-  assert.equal(QUIT_KINDS.length, 5)
+  assert.equal(QUIT_KINDS.length, 6)
 })
 
 test("success claims are detected separately", () => {
