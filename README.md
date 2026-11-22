@@ -6,7 +6,13 @@
 
 # NII — Nothing Is Impossible
 
-Give OpenCode the taste of determination to attempt and solve Impossibly Possible tasks.
+### Give OpenCode the taste of determination to attempt and solve Impossibly Possible tasks.
+
+[![npm version](https://img.shields.io/npm/v/opencode-nii)](https://www.npmjs.com/package/opencode-nii)
+[![npm downloads](https://img.shields.io/npm/dt/opencode-nii)](https://www.npmjs.com/package/opencode-nii)
+[![License: MIT](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
+[![OpenCode V2](https://img.shields.io/badge/OpenCode-V2-7c3aed)](https://opencode.ai)
+[![GitHub stars](https://img.shields.io/github/stars/velo4705/nii?style=social)](https://github.com/velo4705/nii)
 
 </div>
 
