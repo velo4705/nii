@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="NII — Nothing Is Impossible">
+  <defs>
+    <clipPath id="nii-diag"><rect x="0" y="140" width="512" height="232"/></clipPath>
+  </defs>
+  <path d="M91 125 L270 390" fill="none" stroke="#0F172A" stroke-width="42" stroke-linecap="round" clip-path="url(#nii-diag)"/>
+  <rect x="70" y="140" width="42" height="232" rx="10" fill="#0F172A"/>
+  <path d="M292 150 C 280 215, 270 295, 270 362" fill="none" stroke="#0F172A" stroke-width="42" stroke-linecap="butt"/>
+  <rect x="271" y="140" width="42" height="20" rx="10" fill="#0F172A"/>
+  <rect x="249" y="352" width="42" height="20" rx="10" fill="#0F172A"/>
+  <rect x="320" y="140" width="42" height="232" rx="10" fill="#0F172A"/>
+  <rect x="396" y="140" width="42" height="232" rx="10" fill="#0F172A"/>
+</svg>

@@ -1,0 +1,54 @@
+[
+ {
+  "shape": "Feature Stack",
+  "theme": "Console (by request, graphite)",
+  "axes": "dark/grotesk-sans/cool",
+  "hero": "Banner",
+  "nav": "banner over a bar",
+  "footer": "mast",
+  "imagery": "product built in slots, no photographs",
+  "photos": [],
+  "entry": "try",
+  "fingerprint": "pinned-ledger/hook-decision-map/contract-table/entry-rows/install-band",
+  "sections": [
+   "Hero",
+   "Pinned",
+   "Split",
+   "Table",
+   "Rows",
+   "Band",
+   "Footer"
+  ],
+  "signature": "the SKILL.md loop rendered as the hero screen",
+  "waived": [],
+  "prompt": "User chose Console from a six-theme shortlist for promoting NII. Keep black primary, white-outline boxes and all copy.",
+  "date": "2026-11-23",
+  "mode": "build"
+ },
+ {
+  "shape": "Feature Stack",
+  "theme": "Cobalt (monochrome override: user)",
+  "axes": "light/grotesk-sans/cool",
+  "hero": "Banner",
+  "nav": "banner over a bar",
+  "footer": "mast",
+  "imagery": "product built in slots, no photographs",
+  "photos": [],
+  "entry": "try",
+  "fingerprint": "pinned-mandate/hook-decision-map/contract-table/entry-rows/install-band",
+  "sections": [
+   "Hero",
+   "Pinned",
+   "Split",
+   "Table",
+   "Rows",
+   "Band",
+   "Footer"
+  ],
+  "signature": "the SKILL.md loop rendered as the hero screen",
+  "waived": [],
+  "prompt": "User asked for a GitHub Pages site for NII using Hallmark and humanizer. Black and white, technical, shows how NII looks as a skill.",
+  "date": "2026-11-23",
+  "mode": "build"
+ }
+]

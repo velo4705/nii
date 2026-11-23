@@ -53,7 +53,7 @@ test("the npx-style setup subcommand is accepted", () => {
     assert.ok(existsSync(join(dir, ".opencode/plugins/nii/index.ts")))
 
     const help = run(["help"])
-    assert.match(help, /npx opencode-nii@latest setup/)
+    assert.match(help, /npx nii-skill@latest setup/)
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

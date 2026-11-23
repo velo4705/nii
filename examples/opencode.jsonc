@@ -5,7 +5,7 @@
   // For an npm/global install, pass options through the plugins array:
   "plugins": [
     {
-      "package": "opencode-nii",
+      "package": "nii-skill",
       "options": {
         // Learn strategies per project (default). true = share across projects.
         "shareLearning": false,

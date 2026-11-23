@@ -1,13 +1,15 @@
 {
-  "name": "opencode-nii",
+  "name": "nii-skill",
   "version": "1.0.4",
-  "description": "Nothing Is Impossible — bounded, adaptive persistence for OpenCode agents",
+  "description": "Nothing Is Impossible — a portable agent skill for bounded, adaptive persistence",
   "license": "MIT",
   "type": "module",
   "keywords": [
     "opencode",
-    "opencode-plugin",
+    "claude-code",
+    "codex-cli",
     "agent",
+    "skill",
     "persistence",
     "research"
   ],
@@ -18,7 +20,7 @@
     ".": "./.opencode/plugins/nii/index.ts"
   },
   "bin": {
-    "opencode-nii": "./scripts/install.mjs",
+    "nii-skill": "./scripts/install.mjs",
     "nii-install": "./scripts/install.mjs",
     "nii-evaluate": "./core/cli.ts",
     "nii-check": "./core/cli.ts",

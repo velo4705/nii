@@ -1,6 +1,6 @@
 # Cross-agent adapters
 
-`opencode-nii` ships on OpenCode first. The portable engine lives in `core/` with zero OpenCode imports, so other harnesses only need a thin adapter. These adapters are specified here, not yet live-tested.
+`nii-skill` ships on OpenCode first. The portable engine lives in `core/` with zero OpenCode imports, so other harnesses only need a thin adapter. These adapters are specified here, not yet live-tested.
 
 ## The core contract
 

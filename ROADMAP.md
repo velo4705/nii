@@ -43,7 +43,7 @@ Legend:
 - **Broader quit detection** — assistant text is scanned for refusal, handoff, partial-answer, and uncertainty signals, plus unverified success claims that demand evidence.
 - **Bounded case-matrix validation** — pivots require a max-7-case matrix across trivial/typical/boundary/adversarial categories; reports are detected in text and stored with learned strategies as confidence and bounds; coach hints surface those bounds. See `validation.ts`.
 
-**Installation setup:** 🟢 — `scripts/install.mjs` with a formatted banner and interactive menu: OpenCode CLI / Desktop, Flatpak (Linux only), or this project. Non-interactive flags `--cli` / `--flatpak` / `--local` / `--force` / `--dry-run`; bins `opencode-nii` / `nii-install` / `nii`; canonical `setup` subcommand (`npx opencode-nii@latest setup`) and `uninstall` subcommand (`npx opencode-nii@latest uninstall`) that removes just the NII entry from Native/Flatpak `opencode.json` — defaults to **both platforms**, with a warning during setup when the other platform is already connected; `INSTALL.md` + `examples/opencode.jsonc`; 15 installer tests. Note: the unscoped npm name `nii` is taken by an unrelated framework; a scoped `@nii/nii` alias would make `npx @nii/nii@latest setup` work with the already-wired `nii` bin.
+**Installation setup:** 🟢 — `scripts/install.mjs` with a formatted banner and interactive menu: OpenCode CLI / Desktop, Flatpak (Linux only), or this project. Non-interactive flags `--cli` / `--flatpak` / `--local` / `--force` / `--dry-run`; bins `nii-skill` / `nii-install` / `nii`; canonical `setup` subcommand (`npx nii-skill@latest setup`) and `uninstall` subcommand (`npx nii-skill@latest uninstall`) that removes just the NII entry from Native/Flatpak `opencode.json` — defaults to **both platforms**, with a warning during setup when the other platform is already connected; `INSTALL.md` + `examples/opencode.jsonc`; 15 installer tests. The canonical npm name is `nii-skill`; the old `opencode-nii` entry is still recognised for existing installs. The unscoped npm name `nii` is taken by an unrelated framework.
 
 **Test coverage:** unit tests for every pure module plus `tests/session.test.ts`, a session-lifecycle integration suite that exercises the full state machine (66 checks total).
 
@@ -59,13 +59,13 @@ Refusals and goal restatement are additions to this milestone's acceptance crite
 
 *MIT license, packaged, installable from npm.*
 
-**Goal:** Publish `opencode-nii` so users can load it with `"plugins": ["opencode-nii"]`.
+**Goal:** Publish `nii-skill` so users can load it with `"plugins": ["nii-skill"]`.
 
 **Milestone status:** 🟢
 
 **Acceptance criteria:**
 
-- Package name `opencode-nii` verified available on npm.
+- Package name `nii-skill` verified available on npm.
 - `npm pack` produces the expected 12 files, including the hidden plugin directory.
 - Tarball installs and loads in a fresh project.
 - Legal docs complete (`LICENSE`, `README.md`, `CONTRIBUTING.md` accurate).
@@ -134,7 +134,7 @@ Observed by the maintainer on a real hard task: the agent invoked NII and kept w
 *Small-bore, high-value consistency.*
 
 - Ensure `/nii` works identically in V1 and V2 (if loaded via V2 `server`) — code review.
-- Publish `@nii/nii` as a scoped alias? (Formalizes the identity users know from `nii`.)
+- Publish `nii-skill` as the canonical npm name, superseding `opencode-nii`.
 - Add `CHANGELOG.md` with release notes.
 - Add a `nii self-test` command that re-runs `npm test` from the plugin.
 

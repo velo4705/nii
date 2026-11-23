@@ -66,16 +66,16 @@ function usage() {
   console.log(`NII — Nothing Is Impossible · setup
 
 Usage:
-  npx opencode-nii@latest setup                 # interactive menu
-  npx opencode-nii@latest setup [project-dir]   # local project, no prompt
-  npx opencode-nii@latest setup --cli           # OpenCode CLI / Desktop
-  npx opencode-nii@latest setup --flatpak       # Flatpak (Linux only)
-  npx opencode-nii@latest setup --local         # current project
+  npx nii-skill@latest setup                 # interactive menu
+  npx nii-skill@latest setup [project-dir]   # local project, no prompt
+  npx nii-skill@latest setup --cli           # OpenCode CLI / Desktop
+  npx nii-skill@latest setup --flatpak       # Flatpak (Linux only)
+  npx nii-skill@latest setup --local         # current project
 
-  npx opencode-nii@latest uninstall              # interactive menu
-  npx opencode-nii@latest uninstall --cli        # native config only
-  npx opencode-nii@latest uninstall --flatpak    # Flatpak config only
-  npx opencode-nii@latest uninstall --both       # both configs
+  npx nii-skill@latest uninstall              # interactive menu
+  npx nii-skill@latest uninstall --cli        # native config only
+  npx nii-skill@latest uninstall --flatpak    # Flatpak config only
+  npx nii-skill@latest uninstall --both       # both configs
 
 Options:
   --cli          connect to native OpenCode CLI / Desktop config
@@ -266,6 +266,7 @@ function isNiiEntry(entry) {
   if (typeof entry !== "string") return false
   const value = entry.toLowerCase()
   return (
+    value === "nii-skill" ||
     value === "opencode-nii" ||
     value === "@nii/nii" ||
     /^file:.*\/plugins\/nii\/?$/i.test(value) ||
@@ -299,7 +300,7 @@ async function warnAboutOtherPlatforms(activeDir) {
     if (target.configDir === activeDir) continue
     if (await configHasNii(target.configDir)) {
       console.log(`\nNote: NII is also connected in the ${target.label} config. Running both can register hooks twice.`)
-      console.log(`Use 'npx opencode-nii@latest uninstall' to clean up both.`)
+      console.log(`Use 'npx nii-skill@latest uninstall' to clean up both.`)
     }
   }
 }

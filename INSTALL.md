@@ -1,6 +1,6 @@
 # Installing NII
 
-NII needs OpenCode **V2** (`v2.0.32` or later). There are two supported setups.
+The OpenCode plugin needs OpenCode **V2** (`v2.0.32` or later). Other agents use the portable skill and hook contract in [ADAPTERS.md](ADAPTERS.md). For OpenCode there are two supported setups.
 
 ## 1. Local install (recommended for a single project)
 
@@ -19,7 +19,7 @@ node scripts/install.mjs /path/to/your/project
 Once published, the npx form is:
 
 ```sh
-npx opencode-nii@latest setup
+npx nii-skill@latest setup
 ```
 
 It opens a menu (beautifully formatted banner included):
@@ -38,13 +38,13 @@ Choose [1]:
 Pick `1` for native CLI/Desktop, `2` for the Flatpak sandbox (Linux only), or `3` for a single project. For scripts and CI, skip the menu with a flag or a directory:
 
 ```sh
-npx opencode-nii@latest setup --cli
-npx opencode-nii@latest setup --flatpak
-npx opencode-nii@latest setup --local
-npx opencode-nii@latest setup /path/to/your/project
+npx nii-skill@latest setup --cli
+npx nii-skill@latest setup --flatpak
+npx nii-skill@latest setup --local
+npx nii-skill@latest setup /path/to/your/project
 ```
 
-`setup` is the canonical subcommand; `install` is an alias. The exact command `npx nii@latest setup` is **not available** because the `nii` name on npm already belongs to an unrelated framework. If you publish a scoped alias `@nii/nii`, the `nii` bin is already wired, so `npx @nii/nii@latest setup` will work too.
+`setup` is the canonical subcommand; `install` is an alias. The npm package is `nii-skill`. The old `opencode-nii` name is still recognised in existing OpenCode config entries. The exact command `npx nii@latest setup` is **not available** because the `nii` name on npm belongs to an unrelated framework.
 
 Then:
 
@@ -75,7 +75,7 @@ Or, once published to npm, add to `opencode.json(c)`:
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-nii"]
+  "plugins": ["nii-skill"]
 }
 ```
 
@@ -107,7 +107,7 @@ Re-running the installer on an identical install is a no-op. If the destination 
 ## Uninstall
 
 ```sh
-npx opencode-nii@latest uninstall
+npx nii-skill@latest uninstall
 ```
 
 The `uninstall` command removes **only the NII entries from `opencode.json`**. Since NII can be connected to both Native CLI/Desktop and Flatpak on the same machine, the default is **both platforms** — this avoids leaving a second instance registered (which would double-run hooks).
@@ -115,9 +115,9 @@ The `uninstall` command removes **only the NII entries from `opencode.json`**. S
 The interactive menu lets you pick one platform or both; non-interactive forms:
 
 ```sh
-npx opencode-nii@latest uninstall --cli       # native only
-npx opencode-nii@latest uninstall --flatpak   # Flatpak only
-npx opencode-nii@latest uninstall --both      # both (same as default)
+npx nii-skill@latest uninstall --cli       # native only
+npx nii-skill@latest uninstall --flatpak   # Flatpak only
+npx nii-skill@latest uninstall --both      # both (same as default)
 ```
 
 Setup also warns if NII is already connected on the other platform.

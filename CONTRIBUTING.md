@@ -87,7 +87,7 @@ Include:
 
 ## Release
 
-The package is `opencode-nii`, MIT-licensed. `npm pack --dry-run` must show exactly: the seven files in `.opencode/plugins/nii/`, `package.json`, `README.md`, `CONTRIBUTING.md`, and `LICENSE`. A tarball must install with `npm install <tarball>` and the installed plugin files must load from a fresh project's `.opencode/plugins/` directory.
+The package is `nii-skill`, MIT-licensed. `npm pack --dry-run` must show exactly: the seven files in `.opencode/plugins/nii/`, `package.json`, `README.md`, `CONTRIBUTING.md`, and `LICENSE`. A tarball must install with `npm install <tarball>` and the installed plugin files must load from a fresh project's `.opencode/plugins/` directory.
 
 Publishing is a separate, explicit step (`npm login && npm publish`) and requires the maintainer's npm account. Do not publish as part of a normal PR.
 

@@ -19,4 +19,4 @@ Did the hook block a premature stop, or allow a legitimate one?
 Include the exit code and stderr. Do not include API keys or full transcripts.
 
 **NII version**
-`npx opencode-nii@latest --help` or your installed version.
+`npx nii-skill@latest --help` or your installed version.

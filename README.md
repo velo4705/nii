@@ -6,11 +6,11 @@
 
 # NII — Nothing Is Impossible
 
-### Give OpenCode the taste of determination to attempt and solve Impossibly Possible tasks.
+### Give your agent the taste of determination to attempt and solve Impossibly Possible tasks.
 
 [![CI](https://github.com/velo4705/nii/actions/workflows/ci.yml/badge.svg)](https://github.com/velo4705/nii/actions/workflows/ci.yml)
-[![npm version](https://img.shields.io/npm/v/opencode-nii)](https://www.npmjs.com/package/opencode-nii)
-[![npm downloads](https://img.shields.io/npm/dt/opencode-nii)](https://www.npmjs.com/package/opencode-nii)
+[![npm version](https://img.shields.io/npm/v/nii-skill)](https://www.npmjs.com/package/nii-skill)
+[![npm downloads](https://img.shields.io/npm/dt/nii-skill)](https://www.npmjs.com/package/nii-skill)
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
 [![OpenCode V2](https://img.shields.io/badge/OpenCode-V2-7c3aed)](https://opencode.ai)
 [![GitHub stars](https://img.shields.io/github/stars/velo4705/nii?style=social)](https://github.com/velo4705/nii)
@@ -127,7 +127,7 @@ After publication:
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-nii"]
+  "plugins": ["nii-skill"]
 }
 ```
 
@@ -137,7 +137,7 @@ With options:
 {
   "plugins": [
     {
-      "package": "opencode-nii",
+      "package": "nii-skill",
       "options": {
         "coachModel": { "providerID": "anthropic", "id": "claude-sonnet-4-5" },
         "shareLearning": false,

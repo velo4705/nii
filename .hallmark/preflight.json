@@ -1,0 +1,21 @@
+{
+  "scanned": "2026-11-23",
+  "findings": {
+    "fonts": "no webfont links or font tokens in the repo (README.md, package.json)",
+    "palette": "no :root tokens or CSS files; product assets are black and white (assets/)",
+    "motion": "no motion library (package.json scripts: test, pack:check)",
+    "spacing": "no spacing scale in the project",
+    "framework": "none; static GitHub Pages is a clean slate",
+    "product": "nii-skill 1.0.4 (package.json L2-L3), Node >=24 (L14-L16)"
+  },
+  "preserve": [
+    "NII logo, mark and banner in assets/",
+    "real product facts and honest adapter labels"
+  ],
+  "introduce": [
+    "Console graphite theme by request with a black-and-white override",
+    "Feature Stack shape and hero discipline",
+    "typography tokens, keycap controls, graphite code panels",
+    "GitHub Pages site in docs/ with a deploy workflow"
+  ]
+}

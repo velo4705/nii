@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NII, Nothing Is Impossible</title>
+  <meta name="description" content="NII is a portable agent skill that keeps working through refusal, verifies the result, and records what it ruled out.">
+  <link rel="icon" href="assets/nii-mark.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Host+Grotesk:wght@400;500&family=Atkinson+Hyperlegible+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" data-nav>
+    <div class="container nav__inner">
+      <a class="nav__brand" href="#top" aria-label="NII home">
+        <img src="assets/nii-mark.svg" width="28" height="28" alt="">
+      </a>
+      <nav class="nav__links" aria-label="Main">
+        <a href="#skill">Skill</a>
+        <a href="#contract">Contract</a>
+        <a href="#run">Run it</a>
+        <a class="nav__action" href="#install">Install</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="container hero__inner">
+        <div class="hero__copy">
+          <h1>NII turns refusal into method, then proof.</h1>
+          <p class="lead">It asks for the blocker, then changes method and checks the result.</p>
+          <div class="hero__actions">
+            <div class="cmd">
+              <code id="setup-cmd-hero">npx nii-skill@latest setup</code>
+              <button class="copy" type="button" data-copy="#setup-cmd-hero" aria-live="polite">Copy setup command</button>
+            </div>
+            <a class="text-link" href="#skill">See the skill</a>
+          </div>
+        </div>
+
+        <figure class="screen" data-slot="hero-skill" data-kind="product" data-alt="A rendered view of the NII skill file with its loop and memory rules">
+          <div class="screen__head">
+            <span class="screen__file">universal/SKILL.md</span>
+            <span class="screen__state">skill loaded</span>
+          </div>
+          <p class="screen__title">The loop</p>
+          <p class="screen__quote">"Impossible" means "not yet solved with the current approach."</p>
+          <ol class="steps">
+            <li>Name the precise blocker.</li>
+            <li>Define observable evidence that would prove the task done.</li>
+            <li>List three genuinely different approaches.</li>
+            <li>Take the smallest step of one approach and verify it.</li>
+            <li>If it failed, record why and pick an approach you have not used.</li>
+          </ol>
+          <p class="screen__foot">Reads <code>.nii/memory.json</code> before choosing a method.</p>
+        </figure>
+      </div>
+    </section>
+    <section class="section pinned" id="skill">
+      <div class="container pinned__grid">
+        <div class="pinned__aside">
+          <h2>The ledger stays in view.</h2>
+          <p class="lead">The Stop hook reads a refusal and starts the loop.</p>
+          <a class="text-link" href="https://github.com/velo4705/nii/blob/main/universal/SKILL.md">Read the full skill</a>
+        </div>
+        <div class="pinned__panes">
+          <article class="moment">
+            <h3>Quit signal</h3>
+            <figure class="readout" data-slot="moment-quit" data-kind="product" data-alt="A rendered stop-hook decision showing a refusal becoming a push">
+              <div class="readout__head"><span>stdin</span><span>stop event</span></div>
+              <dl>
+                <div class="readout__row"><dt>text</dt><dd>"I can't make it work"</dd></div>
+                <div class="readout__row"><dt>evaluate</dt><dd><code>PUSH</code></dd></div>
+                <div class="readout__row"><dt>reason</dt><dd>verification missing</dd></div>
+              </dl>
+            </figure>
+          </article>
+          <article class="moment">
+            <h3>Pivot</h3>
+            <figure class="readout" data-slot="moment-pivot" data-kind="product" data-alt="A rendered pivot note showing a failed approach ruled out and a different one chosen">
+              <div class="readout__head"><span>ledger</span><span>this project</span></div>
+              <dl>
+                <div class="readout__row"><dt>failure</dt><dd><code>shell exit 1</code></dd></div>
+                <div class="readout__row"><dt>next</dt><dd>change representation</dd></div>
+                <div class="readout__row"><dt>methods</dt><dd>different mechanism, not a new parameter</dd></div>
+              </dl>
+            </figure>
+          </article>
+          <article class="moment">
+            <h3>Proof gate</h3>
+            <figure class="readout" data-slot="moment-proof" data-kind="product" data-alt="A rendered proof check showing a clean diff and a passing exit code">
+              <div class="readout__head"><span>verify</span><span>exit 0</span></div>
+              <dl>
+                <div class="readout__row"><dt>diff</dt><dd>no deleted tests or stubbed logic</dd></div>
+                <div class="readout__row"><dt>signal</dt><dd><code>&lt;nii:done /&gt;</code></dd></div>
+                <div class="readout__row"><dt>decision</dt><dd><code>DONE</code></dd></div>
+              </dl>
+            </figure>
+          </article>
+          <article class="moment">
+            <h3>Memory</h3>
+            <figure class="readout" data-slot="moment-memory" data-kind="product" data-alt="A rendered memory file showing the ruled-out path and the working strategy">
+              <div class="readout__head"><span>write</span><span>.nii/memory.json</span></div>
+              <dl>
+                <div class="readout__row"><dt>ruled out</dt><dd><code>shell exit 1</code></dd></div>
+                <div class="readout__row"><dt>worked</dt><dd>change representation</dd></div>
+                <div class="readout__row"><dt>scope</dt><dd>this project, loaded next session</dd></div>
+              </dl>
+            </figure>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section split" id="stop">
+      <div class="container split__grid">
+        <div class="split__text">
+          <h2>One stop, two hook decisions.</h2>
+          <p class="lead">The same refusal reaches the Stop hook. The transcript and the ledger decide whether the turn ends or continues.</p>
+        </div>
+        <div class="split__pair">
+          <figure class="outcome" data-slot="stop-without" data-kind="product" data-alt="A rendered Stop hook decision where the turn ends with exit 0">
+            <h3>Without the hook</h3>
+            <div class="readout__head"><span>stop</span><span>exit 0</span></div>
+            <dl>
+              <div class="readout__row map-row"><dt>input</dt><dd>"I can't finish this without access."</dd></div>
+              <div class="readout__row map-row"><dt>hook</dt><dd><code>exit 0</code></dd></div>
+              <div class="readout__row map-row"><dt>next</dt><dd>turn ends here</dd></div>
+            </dl>
+          </figure>
+          <figure class="outcome" data-slot="stop-with" data-kind="product" data-alt="A rendered Stop hook decision where the same refusal is pushed back with exit 2">
+            <h3>With NII</h3>
+            <div class="readout__head"><span>stop</span><span>exit 2</span></div>
+            <dl>
+              <div class="readout__row map-row"><dt>input</dt><dd>"I can't finish this without access."</dd></div>
+              <div class="readout__row map-row"><dt>hook</dt><dd><code>exit 2</code></dd></div>
+              <div class="readout__row map-row"><dt>next</dt><dd>name the blocker, pick another method</dd></div>
+            </dl>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section class="section contract" id="contract">
+      <div class="container">
+        <div class="head-block">
+          <h2>The hook contract, in four cases.</h2>
+          <p class="lead">Checked in CI on Linux and Windows.</p>
+        </div>
+        <div class="table-wrap" tabindex="0" role="region" aria-label="Stop hook contract cases">
+          <table>
+            <thead>
+              <tr><th scope="col">Case</th><th scope="col">Input</th><th scope="col">Result</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Unfinished task</td><td>Valid Stop JSON</td><td><code>exit 2</code>, push prompt on stderr</td></tr>
+              <tr><td>Verified completion</td><td>Passing exit code and completion tag</td><td><code>exit 0</code>, clean stdout</td></tr>
+              <tr><td>Broken stdin</td><td>Truncated non-ASCII payload</td><td>Disk fallback, no crash</td></tr>
+              <tr><td>Loop guard</td><td><code>stop_hook_active</code> past the cap</td><td><code>exit 0</code>, terminal released</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="caption">The cases live in <code>tests/hook.test.ts</code>.</p>
+      </div>
+    </section>
+
+    <section class="section runs" id="run">
+      <div class="container runs__grid">
+        <div class="runs__head">
+          <h2>One skill, three entry points.</h2>
+          <p class="lead">Each path reads the same memory format and the same stop rules.</p>
+        </div>
+        <dl class="runs__list">
+          <div>
+            <dt>OpenCode V2</dt>
+            <dd><code>.opencode/plugins/nii</code></dd>
+            <dd>Live verified</dd>
+          </div>
+          <div>
+            <dt>Claude Code, Codex CLI</dt>
+            <dd><code>core/hook.ts</code> Stop hook</dd>
+            <dd>Schema and CI contract tested</dd>
+          </div>
+          <div>
+            <dt>Other SKILL.md agents</dt>
+            <dd><code>universal/SKILL.md</code></dd>
+            <dd>Passive skill, no hook</dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="band" id="install">
+      <div class="container band__grid">
+        <div class="band__copy">
+          <h2>Set up OpenCode, or use the portable skill.</h2>
+          <p class="lead">The setup command handles OpenCode. <a class="text-link" href="https://github.com/velo4705/nii/blob/main/ADAPTERS.md">Adapters</a> cover Claude Code, Codex CLI and plain SKILL.md agents.</p>
+          <div class="cmd cmd--dark">
+            <code id="setup-cmd">npx nii-skill@latest setup</code>
+            <button class="copy copy--quiet" type="button" data-copy="#setup-cmd" aria-live="polite">Copy setup command</button>
+          </div>
+        </div>
+        <figure class="readout ledger" data-slot="ledger" data-kind="product" data-alt="A rendered ledger showing a ruled-out path, the working pivot and its project scope">
+          <div class="readout__head"><span>ledger</span><span>/nii ledger</span></div>
+          <dl>
+            <div class="readout__row"><dt>ruled out</dt><dd><code>shell exit 1</code></dd></div>
+            <div class="readout__row"><dt>pivot</dt><dd>change representation</dd></div>
+            <div class="readout__row"><dt>scope</dt><dd>this project</dd></div>
+          </dl>
+        </figure>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p class="footer__mark">NII</p>
+      <nav class="footer__links" aria-label="Footer">
+        <a href="https://github.com/velo4705/nii">GitHub</a>
+        <a href="https://www.npmjs.com/package/nii-skill">npm</a>
+        <a href="https://github.com/velo4705/nii/blob/main/README.md">Readme</a>
+        <a href="https://github.com/velo4705/nii/blob/main/ADAPTERS.md">Adapters</a>
+        <a href="https://github.com/velo4705/nii/issues/new/choose">Issues</a>
+      </nav>
+      <p class="footer__legal">MIT licensed. An OpenCode plugin and a portable agent skill.</p>
+    </div>
+  </footer>
+
+  <script>window.hallmarkSlots = (m) => { for (const [k, v] of Object.entries(m)) { const s = document.querySelector(`[data-slot="${k}"]`); if (!s) continue; const im = new Image(); im.src = typeof v === 'string' ? v : v.src; im.alt = (typeof v === 'object' && v.alt) || s.dataset.alt || ''; s.querySelectorAll(':scope > img').forEach((o) => o.remove()); s.prepend(im); } };
+document.querySelectorAll('[data-slot] img').forEach((i) => { if (i.complete && !i.naturalWidth) i.remove(); else i.addEventListener('error', () => i.remove(), { once: true }); });</script>
+  <script>
+    document.querySelectorAll('[data-copy]').forEach((button) => {
+      const original = button.textContent
+      const reset = () => { button.textContent = original; button.classList.remove('is-success', 'is-error') }
+      button.addEventListener('click', async () => {
+        const target = document.querySelector(button.dataset.copy)
+        if (!target || !navigator.clipboard) { button.classList.add('is-error'); button.textContent = 'Copy failed'; setTimeout(reset, 1800); return }
+        button.setAttribute('aria-busy', 'true')
+        button.textContent = 'Copying'
+        try {
+          await navigator.clipboard.writeText(target.textContent.trim())
+          button.classList.add('is-success')
+          button.textContent = 'Copied'
+        } catch {
+          button.classList.add('is-error')
+          button.textContent = 'Copy failed'
+        } finally {
+          button.removeAttribute('aria-busy')
+          setTimeout(reset, 1800)
+        }
+      })
+    })
+  </script>
+</body>
+</html>
