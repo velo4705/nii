@@ -1,6 +1,6 @@
 {
   "name": "nii-skill",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "description": "Nothing Is Impossible — a portable agent skill for bounded, adaptive persistence",
   "license": "MIT",
   "type": "module",
