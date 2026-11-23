@@ -45,7 +45,8 @@ test("the mandate stays short enough for a system-injected instruction", () => {
 
 test("the inline skill content matches SKILL.md exactly", () => {
   const skillFile = readFileSync(new URL(".opencode/plugins/nii/SKILL.md", projectRoot), "utf8")
-  assert.equal(SKILL_PLAYBOOK.trim(), skillFile.trim())
+  // git may check out CRLF on Windows; source strings use LF.
+  assert.equal(SKILL_PLAYBOOK.trim(), skillFile.replace(/\r\n/g, "\n").trim())
 })
 
 test("help text documents all four commands", () => {

@@ -22,11 +22,18 @@ function sandbox() {
   return mkdtempSync(join(tmpdir(), "nii-install-test-"))
 }
 
+const flatpakOnly = { skip: process.platform !== "linux" && "Flatpak is Linux only" }
+
+function assertCreating(output: string, dir: string) {
+  const expected = join(dir, ".opencode", "plugins", "nii")
+  assert.ok(output.includes(expected), output)
+}
+
 test("local install copies the plugin and is idempotent", () => {
   const dir = sandbox()
   try {
     const output = run([dir])
-    assert.match(output, /Creating .*\.opencode\/plugins\/nii/)
+    assertCreating(output, dir)
     assert.ok(existsSync(join(dir, ".opencode/plugins/nii/index.ts")))
     assert.ok(existsSync(join(dir, ".opencode/plugins/nii/SKILL.md")))
 
@@ -42,7 +49,7 @@ test("the npx-style setup subcommand is accepted", () => {
   const dir = sandbox()
   try {
     const output = run(["setup", dir])
-    assert.match(output, /Creating .*\.opencode\/plugins\/nii/)
+    assertCreating(output, dir)
     assert.ok(existsSync(join(dir, ".opencode/plugins/nii/index.ts")))
 
     const help = run(["help"])
@@ -96,7 +103,7 @@ test("--cli connects to the native OpenCode config", () => {
   }
 })
 
-test("--flatpak connects to the Flatpak sandbox config", () => {
+test("--flatpak connects to the Flatpak sandbox config", flatpakOnly, () => {
   const dir = sandbox()
   try {
     const flatpakDir = join(dir, "flatpak-config")
@@ -130,7 +137,7 @@ test("uninstall removes only the NII entry from the native config", () => {
   }
 })
 
-test("uninstall works with the Flatpak config", () => {
+test("uninstall works with the Flatpak config", flatpakOnly, () => {
   const dir = sandbox()
   try {
     const flatpakDir = join(dir, "flatpak-config")
@@ -162,7 +169,7 @@ test("uninstall is safe when there is nothing to remove", () => {
   }
 })
 
-test("setup warns when NII is already connected on the other platform", () => {
+test("setup warns when NII is already connected on the other platform", flatpakOnly, () => {
   const dir = sandbox()
   try {
     const configHome = join(dir, "config")
@@ -177,7 +184,7 @@ test("setup warns when NII is already connected on the other platform", () => {
   }
 })
 
-test("uninstall defaults to removing NII from both platforms", () => {
+test("uninstall defaults to removing NII from both platforms", flatpakOnly, () => {
   const dir = sandbox()
   try {
     const configHome = join(dir, "config")
@@ -197,7 +204,7 @@ test("uninstall defaults to removing NII from both platforms", () => {
   }
 })
 
-test("uninstall --cli leaves the Flatpak entry intact", () => {
+test("uninstall --cli leaves the Flatpak entry intact", flatpakOnly, () => {
   const dir = sandbox()
   try {
     const configHome = join(dir, "config")
