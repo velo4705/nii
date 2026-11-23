@@ -8,6 +8,7 @@
 
 ### Give OpenCode the taste of determination to attempt and solve Impossibly Possible tasks.
 
+[![CI](https://github.com/velo4705/nii/actions/workflows/ci.yml/badge.svg)](https://github.com/velo4705/nii/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/opencode-nii)](https://www.npmjs.com/package/opencode-nii)
 [![npm downloads](https://img.shields.io/npm/dt/opencode-nii)](https://www.npmjs.com/package/opencode-nii)
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
@@ -52,6 +53,14 @@ Quit signals in assistant text fall into four families. The plugin reads them fr
 The same signals are scanned in user prompts. If you write "I can't make it", NII injects a directive into that prompt telling the agent to restate the blocker and try at least three unused approaches. Two signals, or one plus a real tool failure, bring in a quit-specific mandate. A single stray phrase does nothing on its own. A separate success-claim detector watches for "Done!", "that should work", and "all tests pass" while failures remain in the window. It asks for evidence before the task can end, and a successful tool call clears it. When a pivot fires, the message asks the agent to restate the goal and name the one piece of evidence that would prove it done.
 
 A genuine blocker in tool output (permission denied, 401/403, missing credentials) outranks every persistence tier. Pivoting stops and the agent reports the blocker and asks the user. When the blocker is real, stopping is the right result.
+
+### Positive-proof gate
+
+Quit phrasing is only a secondary signal. The main rule is that an active task is unfinished until evidence proves otherwise.
+
+Conversation-only turns stay dormant. If the agent edited files or ran commands, `session.idle` triggers the gate. A completion claim, including `<nii:done />`, is ignored unless verification actually passed. Set `verifyCmd` in plugin options and NII runs that command in the project directory; without it, the last tool exit code is used. The working-tree diff is also checked for cheap green exits such as deleted tests, commented-out assertions, TODO stubs, or `unimplemented!()` placeholders.
+
+NII stands down only on four signals: a verified pass with no cheats plus a completion claim, a user abort, an explicit user gate such as a question tool or missing credentials, or a configured `maxContinuations` ceiling, which reports the full ruled-out ledger instead of looping.
 
 ### 2. Auto-invoked playbook skill
 
@@ -133,6 +142,11 @@ With options:
         "coachModel": { "providerID": "anthropic", "id": "claude-sonnet-4-5" },
         "shareLearning": false,
         "maxPivots": 0,
+        "verifyCmd": "npm test",
+        "maxContinuations": 0,
+        "maxWallMs": 0,
+        "resumeDelayMs": 0,
+        "allowSubjectiveCompletion": true,
         "retryMaxRetries": 3,
         "retryBaseDelayMs": 1000,
         "retryMaxDelayMs": 30000
@@ -145,6 +159,11 @@ With options:
 - `coachModel`: model used for the small strategy-coach generation. Defaults to the session's default model.
 - `shareLearning`: `false` by default keeps learning scoped to the current project; `true` uses a shared global store.
 - `maxPivots`: strategy pivots allowed per session. `0` (default) means unlimited; a positive number sets a cap.
+- `verifyCmd`: shell command used by the proof gate to verify completion. Without it, the last tool exit code is used.
+- `maxContinuations`: hard ceiling on proof-gate continuations. `0` means unlimited; a positive value reports the ruled-out ledger instead of looping.
+- `maxWallMs`: wall-clock budget for long runs. `0` means no limit; a positive value ends with a ledger report.
+- `resumeDelayMs`: pause between proof-gate continuations, useful for pacing long unattended runs.
+- `allowSubjectiveCompletion`: when `true` (default), tasks with no verifier can finish on a completion tag plus real edits. `false` requires strict verification.
 - `retryMaxRetries` / `retryBaseDelayMs` / `retryMaxDelayMs`: tune the bounded retry hook. Defaults: 3, 1000 ms, and 30 000 ms.
 
 Confirm it is active with `/nii status`.
@@ -157,6 +176,7 @@ Confirm it is active with `/nii status`.
 | `/nii off` | Disable the mandate for this session (kill switch) |
 | `/nii reset` | Clear the failure streak and pivot budget (keeps learning) |
 | `/nii status` | Show whether NII is active, pivots used, and last pivot |
+| `/nii ledger` | Show every ruled-out path, delivered pivot and learned strategy |
 | `/nii help` | Show usage |
 
 Disabling takes effect on the next model call, because the gate lives in the `context` hook. State uses plugin-scoped durable storage, so it survives reloads and applies only to the session that changed it.
@@ -185,13 +205,66 @@ See [ROADMAP.md](ROADMAP.md) for the full milestone plan. Milestones 1 (core loo
 ## Testing
 
 ```sh
-npm test           # 126 checks (unit + session/retry/atomic/quit/validation + installer/setup/uninstall + benchmark)
+npm test           # 156 checks (unit + session/retry/atomic/quit/proof/memory/validation + installer/setup/uninstall + benchmark + core + hook)
 npm run pack:check # inspect tarball contents
 ```
 
 `tests/session.test.ts` drives full session lifecycles through the real state and learning modules: failure windows, one pivot at a time, successful and failed pivots, cross-session and cross-project learning, genuine blockers, refusal escalation, pivot-budget exhaustion, and `/nii reset`.
 
 Node 24 has native TypeScript support, so there are no dependencies or build step.
+
+## Role impact, verified
+
+Checked against the current implementation, not marketing intent.
+
+### Software and systems engineers
+
+- [x] Absorbs repeated failures instead of quitting after two attempts. Unlimited pivots by default; genuine blockers still stop the loop.
+- [x] Steps back only on objective proof. The proof gate uses `verifyCmd` or the last tool exit code, and blocks cheat signals in the diff.
+- [x] Overnight runs end in either a solved problem or a readable ledger. `/nii ledger` lists every ruled-out path, delivered pivot and learned strategy.
+- [x] Project-specific memory is written to `.opencode/nii-memory.json` so later sessions do not repeat failed fixes.
+
+### Researchers and independent tinkerers
+
+- [x] Autonomous hypothesis search. Unlimited pivots, case-matrix validation, ruled-out ledger, and strategy learning run without a fixed attempt ceiling.
+- [x] Built-in long-run control. `maxWallMs` sets a wall-clock budget and `resumeDelayMs` paces continuations; the gate reports the ledger when the budget is spent. The host still has to keep the session alive.
+
+### Minimalist OpenCode power users
+
+- [x] No framework lock-in. One plugin, no multi-agent hierarchy, no custom prompt framework, no dependency install.
+- [x] Invisible during ordinary work. The mandate is injected only for task-intent prompts, active tool sessions, or existing stuck state. Plain Q&A receives no NII instruction.
+
+## Expectations, checked against the code
+
+- [x] High-grind verifiable tasks run for as many iterations as needed. There is no default pivot ceiling; `verifyCmd` supplies the pass/fail oracle.
+- [x] Circular doom loops are blocked. Failure fingerprints, recorded ruled-out paths and a diversity guard force hypothesis shifts.
+- [x] Long runs keep their prompt cache. Continuations use `ctx.session.prompt` on the same session and never switch model or variant, so the session's active model metadata stays intact. The API does not accept a model override on prompt, and NII does not try to pass one.
+- [x] `.opencode/nii-memory.json` compounds repo-specific knowledge across sessions.
+- [x] Genuine blockers end cleanly with a ledger rather than being brute-forced.
+- [x] Subjective tasks have a fallback. With no `verifyCmd` and no tool exit code, a completion tag plus real edits and a clean diff is accepted. Set `allowSubjectiveCompletion: false` to require strict verification.
+- [x] Compaction does not lose the plot. On `session.compaction.ended` NII restores the ledger as an `nii/ledger` instruction entry.
+- [ ] Scheduling beyond the live session. `maxWallMs` and `resumeDelayMs` bound and pace an active run, but a host still has to keep that session alive; NII is not an OS-level job scheduler.
+
+## Other agents
+
+The persistence engine is portable. `core/` has zero OpenCode imports and exposes `evaluate()`, `buildMemoryFile()` and `ledgerText()`. `nii-evaluate` is the harness-neutral CLI that prints `DONE` or `PUSH`:
+
+```sh
+npx nii-evaluate --tools shell,edit --exit-code 1 --text 'I cannot fix this'
+```
+
+`nii-hook` is the shared stdin/exit-code adapter for Claude Code and Codex CLI `Stop` hooks: exit `2` plus a stderr push prompt blocks a premature stop, exit `0` allows it. It reads the transcript path from the hook payload and uses `nii-core`, so it needs no subscription to build or unit-test. `universal/SKILL.md` is the passive companion for agents that support `SKILL.md`, using `.nii/memory.json` as the shared ledger.
+
+[ADAPTERS.md](ADAPTERS.md) has drop-in snippets.
+
+| Harness | Status |
+| --- | --- |
+| OpenCode | Live Verified (Primary) |
+| Claude Code | Schema & CI Contract Tested |
+| Codex CLI | Schema & CI Contract Tested |
+| Cline, Pi, Cursor and other `SKILL.md` agents | Portable skill, passive only |
+
+The hook contract is unit-tested locally against four zero-day traps: valid Stop blocks, verified completion, malformed non-ASCII stdin, and the `stop_hook_active` loop ceiling. Live harness behaviour still needs adopters. Use the **Adapter edge case** issue template to report payload differences.
 
 ## Development
 

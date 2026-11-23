@@ -19,8 +19,26 @@
  * success condition, and a genuine-blocker stop rule.
  */
 
+import { execFileSync } from "node:child_process"
+import { mkdir, writeFile } from "node:fs/promises"
+import { join } from "node:path"
 import { Plugin, Skill } from "@opencode/plugin"
 import { resolveGenerateText } from "./api"
+import {
+  continuationDirective,
+  detectCheats,
+  emptyActivity,
+  exitDecision,
+  isTaskExecution,
+  lightweightPass,
+  recordCompletionTag,
+  recordContinuation,
+  recordExit,
+  recordTool,
+  shouldInjectMandate,
+  wallExceeded,
+  type Activity,
+} from "./proof"
 import { withLock } from "./lock"
 import { parseNiiCommand } from "./commands"
 import {
@@ -51,12 +69,14 @@ import {
   isEnabled,
   readLearning,
   readPending,
+  projectScope,
   readStuck,
   setSessionEnabled,
   writeLearning,
   writePending,
   writeStuck,
 } from "./state"
+import { buildMemoryFile, ledgerText } from "./memory"
 import { niiRetryDecision } from "./retry"
 import {
   buildCoachPrompt,
@@ -81,6 +101,10 @@ import {
   type ToolOutcome,
 } from "./stuck"
 
+/** Per-session proof state. In-memory is enough; idle and tools are live events. */
+const activities = new Map<string, Activity>()
+const lastPrompts = new Map<string, string>()
+
 export default Plugin.define({
   id: "nii",
 
@@ -104,18 +128,156 @@ export default Plugin.define({
       })
     })
 
+    async function syncMemory(sessionID: string) {
+      const stuck = await readStuck(ctx, sessionID)
+      const learned = await readLearning(ctx)
+      const dir = join(ctx.location?.directory ?? process.cwd(), ".opencode")
+      try {
+        await mkdir(dir, { recursive: true })
+        await writeFile(
+          join(dir, "nii-memory.json"),
+          `${JSON.stringify(buildMemoryFile(projectScope(ctx), stuck, learned), null, 2)}\n`,
+          "utf8",
+        )
+      } catch {
+        // Memory is a visibility aid; never break a session over a file write.
+      }
+    }
+
+    async function applyProofGate(sessionID: string) {
+      const activity = activities.get(sessionID) ?? emptyActivity()
+      if (!isTaskExecution(activity) && !activity.blocker && !activity.userAbort) return
+
+      let cheats: string[] = []
+      try {
+        const vcsApi = ctx as unknown as { vcs?: { diff(input?: unknown): Promise<unknown> } }
+        if (vcsApi.vcs?.diff) {
+          cheats = detectCheats(JSON.stringify(await vcsApi.vcs.diff({ mode: "working" })))
+        }
+      } catch {
+        cheats = []
+      }
+
+      const verifyCmd = typeof ctx.options?.verifyCmd === "string" ? ctx.options.verifyCmd : undefined
+      let verifiedPass = false
+      if (verifyCmd) {
+        try {
+          execFileSync("sh", ["-c", verifyCmd], {
+            cwd: ctx.location?.directory ?? process.cwd(),
+            timeout: 120_000,
+            stdio: "pipe",
+          })
+          verifiedPass = true
+        } catch {
+          verifiedPass = false
+        }
+      } else if (activity.lastExitCode !== undefined) {
+        verifiedPass = activity.lastExitCode === 0
+      } else if (ctx.options?.allowSubjectiveCompletion !== false) {
+        verifiedPass = lightweightPass(activity, cheats)
+      }
+
+      const cap =
+        typeof ctx.options?.maxContinuations === "number" ? ctx.options.maxContinuations : 0
+      const budgetReached = cap > 0 && activity.continuations >= cap
+      const maxWallMs =
+        typeof ctx.options?.maxWallMs === "number" ? ctx.options.maxWallMs : 0
+      const decision = exitDecision({
+        activity,
+        verifiedPass,
+        cheats,
+        budgetReached,
+        wallExceeded: wallExceeded(activity, maxWallMs),
+      })
+      if (decision !== "continue") return
+
+      activities.set(sessionID, recordContinuation(activity))
+      const resumeDelayMs =
+        typeof ctx.options?.resumeDelayMs === "number" ? ctx.options.resumeDelayMs : 0
+      if (resumeDelayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, resumeDelayMs))
+      }
+      const sessionApi = ctx as unknown as {
+        session?: { prompt(input: { sessionID: string; text: string }): Promise<unknown> }
+      }
+      if (!sessionApi.session?.prompt) return
+      await sessionApi.session.prompt({
+        sessionID,
+        text: continuationDirective(cheats),
+      })
+    }
+
     // 2. Failure tracking. Session tool events carry the sessionID; the server
     //    ignores `types` and delivers every event, so filter explicitly.
     const controller = new AbortController()
     void (async () => {
       for await (const event of ctx.event.subscribe({
-        types: ["session.tool.failed", "session.tool.success", "session.text.ended"],
+        types: [
+          "session.tool.called",
+          "session.tool.failed",
+          "session.tool.success",
+          "session.text.ended",
+          "session.idle",
+          "session.execution.interrupted",
+          "session.compaction.ended",
+        ],
         signal: controller.signal,
       })) {
+        if (event.type === "session.tool.called") {
+          const call = event.data as { sessionID?: string; name?: string }
+          if (!call.sessionID) continue
+          const current = activities.get(call.sessionID) ?? emptyActivity()
+          activities.set(call.sessionID, recordTool(current, call.name ?? ""))
+          continue
+        }
+
+        if (event.type === "session.execution.interrupted") {
+          const stopped = event.data as { sessionID?: string }
+          if (!stopped.sessionID) continue
+          const current = activities.get(stopped.sessionID) ?? emptyActivity()
+          activities.set(stopped.sessionID, { ...current, userAbort: true })
+          continue
+        }
+
+        if (event.type === "session.compaction.ended") {
+          const compacted = event.data as { sessionID?: string }
+          if (!compacted.sessionID) continue
+          const stuck = await readStuck(ctx, compacted.sessionID)
+          const learned = await readLearning(ctx)
+          const instructions = ctx as unknown as {
+            session?: {
+              instructions?: {
+                entry?: {
+                  put(input: { sessionID: string; key: string; value: string }): Promise<unknown>
+                }
+              }
+            }
+          }
+          try {
+            await instructions.session?.instructions?.entry?.put({
+              sessionID: compacted.sessionID,
+              key: "nii/ledger",
+              value: ledgerText(stuck, learned),
+            })
+          } catch {
+            // Ledger restoration is a best-effort aid.
+          }
+          continue
+        }
+
+        if (event.type === "session.idle") {
+          const idle = event.data as { sessionID?: string }
+          if (!idle.sessionID || !(await isEnabled(ctx, idle.sessionID))) continue
+          await applyProofGate(ctx, idle.sessionID)
+          continue
+        }
+
         if (event.type === "session.text.ended") {
           const textData = event.data as { sessionID?: string; text?: string }
           if (!textData.sessionID || !(await isEnabled(ctx, textData.sessionID))) continue
           const text = textData.text ?? ""
+          const currentActivity = activities.get(textData.sessionID) ?? emptyActivity()
+          activities.set(textData.sessionID, recordCompletionTag(currentActivity, text))
           const quit = detectQuitSignals(text)
           const successClaim = isSuccessClaim(text)
           const categories = detectCaseCategories(text)
@@ -146,6 +308,13 @@ export default Plugin.define({
         if (!data.sessionID) continue
         if (!(await isEnabled(ctx, data.sessionID))) continue
 
+        const activityNow = activities.get(data.sessionID) ?? emptyActivity()
+        const failureText = `${data.error?.type ?? ""} ${toolFailureText(data)}`
+        activities.set(data.sessionID, {
+          ...recordExit(activityNow, data.metadata?.exit),
+          ...(isGenuineBlocker(failureText) ? { blocker: true } : {}),
+        })
+
         const current = await readStuck(ctx, data.sessionID)
 
         if (isToolFailure(event.type, data)) {
@@ -163,6 +332,7 @@ export default Plugin.define({
           if (pending) {
             const learned = await readLearning(ctx)
             await writeLearning(ctx, recordIneffective(learned, pending.signatures, pending.strategy))
+            await syncMemory(data.sessionID)
             await clearPending(ctx, data.sessionID)
           }
           await writeStuck(ctx, data.sessionID, recordFailure(current, toolFailureSignature(data)))
@@ -179,6 +349,7 @@ export default Plugin.define({
             recordLearning(learned, pending.signatures, pending.strategy, Date.now(), pending.validation),
           )
           await clearPending(ctx, data.sessionID)
+          await syncMemory(data.sessionID)
         }
         await writeStuck(ctx, data.sessionID, recordSuccess(current))
       }
@@ -189,6 +360,8 @@ export default Plugin.define({
     //     ignored.
     await ctx.session.hook("prompt", async (event) => {
       if (typeof event.prompt.text !== "string") return
+      const sid = (event as { sessionID?: string }).sessionID
+      if (sid) lastPrompts.set(sid, event.prompt.text)
       const signals = detectQuitSignals(event.prompt.text)
       const directive = quitResponse(signals)
       if (directive) event.prompt.text = `${event.prompt.text}\n\n${directive}`
@@ -201,6 +374,21 @@ export default Plugin.define({
       if (!(await isEnabled(ctx, event.sessionID))) return
 
       const stuck = await readStuck(ctx, event.sessionID)
+      const activity = activities.get(event.sessionID) ?? emptyActivity()
+      if (
+        !shouldInjectMandate(
+          activity,
+          {
+            pivots: stuck.pivots,
+            refusals: stuck.refusals,
+            blockers: stuck.blockers,
+            recentLength: stuck.recent.length,
+          },
+          lastPrompts.get(event.sessionID) ?? "",
+        )
+      ) {
+        return
+      }
       event.system.push({ type: "text", text: motivationFor(stuck, maxPivots) })
 
       // Proactive hint: if strategies are already known to work for this
@@ -332,6 +520,15 @@ export default Plugin.define({
               await ctx.session.synthetic({
                 sessionID,
                 text: statusText(enabled, "session", stuck.pivots, maxPivots, learned.length, stuck.lastPivot),
+              })
+              return
+            }
+            case "ledger": {
+              const stuck = await readStuck(ctx, sessionID)
+              const learned = await readLearning(ctx)
+              await ctx.session.synthetic({
+                sessionID,
+                text: ledgerText(stuck, learned),
               })
               return
             }

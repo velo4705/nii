@@ -35,6 +35,8 @@ pnpm-debug.log*
 .opencode/logs/
 .opencode/*.db
 .opencode/*.sqlite
+.opencode/nii-memory.json
+.nii/memory.json
 
 # Packed artifacts (regenerate with `npm pack`)
 *.tgz

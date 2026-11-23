@@ -1,6 +1,6 @@
 /** Pure parsing for the /nii command, kept separate so it can be tested. */
 
-export type NiiCommand = "on" | "off" | "reset" | "status" | "help"
+export type NiiCommand = "on" | "off" | "reset" | "status" | "ledger" | "help"
 
 export function parseNiiCommand(text: string): NiiCommand {
   const arg = text.trim().split(/\s+/)[0]?.toLowerCase() ?? ""
@@ -14,6 +14,8 @@ export function parseNiiCommand(text: string): NiiCommand {
       return "reset"
     case "status":
       return "status"
+    case "ledger":
+      return "ledger"
     default:
       return "help"
   }

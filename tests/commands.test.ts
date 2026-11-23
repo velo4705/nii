@@ -7,6 +7,7 @@ test("parses every supported /nii subcommand", () => {
   assert.equal(parseNiiCommand("off"), "off")
   assert.equal(parseNiiCommand("RESET"), "reset")
   assert.equal(parseNiiCommand("status"), "status")
+  assert.equal(parseNiiCommand("ledger"), "ledger")
   assert.equal(parseNiiCommand("help"), "help")
 })
 

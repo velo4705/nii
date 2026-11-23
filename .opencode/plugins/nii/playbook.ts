@@ -157,6 +157,7 @@ Usage: /nii [on|off|reset|status|help]
   off     Disable the NII mandate for this session (kill switch)
   reset   Clear this session's failure streak and pivot budget (keeps learning)
   status  Show whether NII is active for this session
+  ledger  Show every ruled-out path, pivot and learned strategy
   help    Show this message
 
 NII treats "impossible" as "not yet solved with the current approach", requires
