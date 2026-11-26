@@ -205,7 +205,7 @@ See [ROADMAP.md](ROADMAP.md) for the full milestone plan. Milestones 1 (core loo
 ## Testing
 
 ```sh
-npm test           # 156 checks (unit + session/retry/atomic/quit/proof/memory/validation + installer/setup/uninstall + benchmark + core + hook)
+npm test           # 160 checks (unit + session/retry/atomic/quit/proof/memory/validation + installer/setup/uninstall + benchmark + core + hook)
 npm run pack:check # inspect tarball contents
 ```
 

@@ -21,11 +21,13 @@ async function main() {
 
   const cwd = typeof input.cwd === "string" && input.cwd ? input.cwd : process.cwd()
   const result = decideHook(input, cwd)
+  if (result.stdout) process.stdout.write(result.stdout)
   if (result.stderr) process.stderr.write(`${result.stderr}\n`)
-  process.exit(result.exitCode)
+  process.exitCode = result.exitCode
 }
 
 main().catch((error) => {
+  process.stdout.write('{"continue":true}\n')
   process.stderr.write(`nii-hook failed: ${(error as Error).message}\n`)
-  process.exit(0)
+  process.exitCode = 0
 })

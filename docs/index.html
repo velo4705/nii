@@ -159,7 +159,7 @@
             </thead>
             <tbody>
               <tr><td>Unfinished task</td><td>Valid Stop JSON</td><td><code>exit 2</code>, push prompt on stderr</td></tr>
-              <tr><td>Verified completion</td><td>Passing exit code and completion tag</td><td><code>exit 0</code>, clean stdout</td></tr>
+              <tr><td>Verified completion</td><td>Passing exit code and completion tag</td><td><code>exit 0</code>, JSON ack on stdout</td></tr>
               <tr><td>Broken stdin</td><td>Truncated non-ASCII payload</td><td>Disk fallback, no crash</td></tr>
               <tr><td>Loop guard</td><td><code>stop_hook_active</code> past the cap</td><td><code>exit 0</code>, terminal released</td></tr>
             </tbody>
